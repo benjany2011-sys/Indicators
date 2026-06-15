@@ -1,0 +1,44 @@
+
+name: Actualizar datos diarios
+
+# Cuándo se ejecuta
+on:
+  schedule:
+    # Todos los días a las 13:00 UTC (aprox. 7-8 a.m. hora de Texas, según horario de verano).
+    # Para cambiar la hora, ajusta el número. GitHub usa hora UTC.
+    - cron: "0 13 * * *"
+  workflow_dispatch:        # permite también correrlo a mano con un botón
+
+# Permiso para que el robot pueda guardar los resultados en el repositorio
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar librerías
+        run: pip install -r requirements.txt
+
+      - name: Correr el script
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python actualizar_datos.py
+
+      - name: Guardar resultados en el repositorio
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add resultados/
+          git commit -m "Actualizacion de datos" || echo "Sin cambios que guardar"
+          git push
+
