@@ -101,6 +101,30 @@ MONEDAS = {
     "KRW": ("KRW por USD", "#,##0.00"),
 }
 
+# Saneamiento: rangos realistas por serie. Cualquier dato fuera del rango se
+# considera erróneo (picos falsos de la fuente) y se marca como vacío; la línea
+# de la gráfica simplemente lo salta. Nota: el límite alto de Henry Hub (25)
+# conserva el pico real del invierno 2021 (tormenta Uri) pero descarta valores
+# imposibles como ~30. Ajusta estos números si algún día resultan muy estrechos.
+RANGOS_VALIDOS = {
+    COL_HH:           (0.5, 25.0),    # Henry Hub $/MMBtu
+    "WTI ($/bbl)":    (5.0, 250.0),   # WTI $/bbl
+    "Brent ($/bbl)":  (5.0, 250.0),   # Brent $/bbl
+}
+
+
+def sanear(df, col):
+    """Marca como vacío los valores de 'col' fuera de su rango realista."""
+    if col not in RANGOS_VALIDOS or col not in df.columns:
+        return df
+    lo, hi = RANGOS_VALIDOS[col]
+    mask = df[col].notna() & ((df[col] < lo) | (df[col] > hi))
+    n = int(mask.sum())
+    if n:
+        log(f"  Saneando {col}: {n} valor(es) fuera de [{lo}, {hi}] -> vacío")
+        df.loc[mask, col] = float("nan")
+    return df
+
 # Para cada divisa se agrega además la columna inversa "USD por <ISO>"
 # (cuántos dólares vale 1 unidad de esa moneda = 1 / "X por USD").
 # Se usan 6 decimales porque las inversas van de ~1.16 (EUR) a ~0.0008 (KRW).
@@ -271,7 +295,13 @@ def construir_diario():
     diario = diario.merge(fx, on="fecha", how="outer")
 
     diario = diario[diario["fecha"] >= FECHA_INICIO].sort_values("fecha")
-    return diario.reset_index(drop=True)
+    diario = diario.reset_index(drop=True)
+
+    # quitar picos falsos de la fuente en precios de energía
+    for col in RANGOS_VALIDOS:
+        diario = sanear(diario, col)
+
+    return diario
 
 
 # ------------------------------------------------------------------
