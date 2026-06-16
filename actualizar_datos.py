@@ -39,6 +39,7 @@ Llaves (EIA y FRED):
 
 import os
 import sys
+import json
 import datetime as dt
 from pathlib import Path
 
@@ -563,6 +564,54 @@ def crear_graficos_fx(diario, ruta_png):
 
 
 # ------------------------------------------------------------------
+# 3b) Exportar datos a JSON (para el panel web / GitHub Pages)
+# ------------------------------------------------------------------
+def escribir_json(diario, infl, ruta):
+    """Vuelca los datos en un JSON compacto que consume el index.html."""
+    def limpia(serie, dec=6):
+        out = []
+        for v in serie:
+            out.append(None if pd.isna(v) else round(float(v), dec))
+        return out
+
+    series = {col: limpia(diario[col]) for col in diario.columns if col != "fecha"}
+
+    resumen = []
+    for nombre, fmt in _series_resumen():
+        if nombre not in diario.columns:
+            continue
+        sub = diario[["fecha", nombre]].dropna()
+        if sub.empty:
+            continue
+        ult = sub.iloc[-1]
+        resumen.append({"serie": nombre, "valor": round(float(ult[nombre]), 6),
+                        "fecha": ult["fecha"].strftime("%Y-%m-%d"), "fmt": fmt})
+
+    inf = infl.dropna(subset=["Inflacion YoY"])
+    if not inf.empty:
+        u = inf.iloc[-1]
+        resumen.append({"serie": "Inflación YoY (CPI)",
+                        "valor": round(float(u["Inflacion YoY"]), 5),
+                        "fecha": u["fecha"].strftime("%Y-%m-%d"), "fmt": "0.0%"})
+
+    obj = {
+        "generado": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación: FRED · "
+                   "Divisas: Frankfurter (BCE)",
+        "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
+        "series": series,
+        "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
+        "inflacion": {
+            "fecha": infl["fecha"].dt.strftime("%Y-%m-%d").tolist(),
+            "yoy": limpia(infl["Inflacion YoY"], 5),
+        },
+        "resumen": resumen,
+    }
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False)
+
+
+# ------------------------------------------------------------------
 # 4) Programa principal
 # ------------------------------------------------------------------
 def main():
@@ -590,6 +639,9 @@ def main():
         crear_graficos(diario, infl, png_recie)
         crear_graficos_fx(diario, png_fx_fecha)
         crear_graficos_fx(diario, png_fx_recie)
+
+        # datos para el panel web (GitHub Pages)
+        escribir_json(diario, infl, CARPETA / "datos.json")
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
