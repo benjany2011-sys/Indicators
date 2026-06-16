@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de mercados</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --azul:#C2410C; --azul2:#EA580C; --acento:#9A3412;
+    --verde:#D97706; --ambar:#B45309;
+    --tinta:#2b2420; --gris:#8a7f76; --linea:#efe6df;
+    --fondo:#fdf6f0; --tarjeta:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--fondo); color:var(--tinta);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;
+  }
+  header{
+    background:var(--azul); color:#fff; padding:22px 26px;
+    box-shadow:0 1px 4px rgba(0,0,0,.15);
+  }
+  header h1{margin:0 0 4px; font-size:22px; font-weight:700; letter-spacing:.2px;}
+  header .meta{font-size:13px; opacity:.85;}
+  .acciones{margin-top:14px; display:flex; flex-wrap:wrap; gap:10px;}
+  .btn{
+    display:inline-block; background:#fff; color:var(--azul);
+    text-decoration:none; font-size:13px; font-weight:600;
+    padding:8px 14px; border-radius:7px; border:1px solid rgba(255,255,255,.4);
+    transition:transform .05s ease, background .15s ease;
+  }
+  .btn:hover{background:#eef1f6;}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent; color:#fff;}
+  .btn.ghost:hover{background:rgba(255,255,255,.12);}
+  main{max-width:1180px; margin:0 auto; padding:24px 20px 60px;}
+  .seccion-titulo{
+    font-size:13px; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--gris); font-weight:700; margin:30px 4px 12px;
+  }
+  .cards{
+    display:grid; gap:12px;
+    grid-template-columns:repeat(auto-fill,minmax(165px,1fr));
+  }
+  .card{
+    background:var(--tarjeta); border:1px solid var(--linea); border-radius:10px;
+    padding:14px 16px; box-shadow:0 1px 2px rgba(20,30,50,.04);
+  }
+  .card .nombre{font-size:12px; color:var(--gris); font-weight:600; min-height:30px;}
+  .card .valor{font-size:23px; font-weight:700; margin-top:4px; color:var(--azul);}
+  .card .fecha{font-size:11px; color:var(--gris); margin-top:3px;}
+  .grid-graf{
+    display:grid; gap:16px; grid-template-columns:repeat(2,1fr);
+  }
+  @media(max-width:820px){ .grid-graf{grid-template-columns:1fr;} }
+  .panel{
+    background:var(--tarjeta); border:1px solid var(--linea); border-radius:10px;
+    padding:16px 16px 10px; box-shadow:0 1px 2px rgba(20,30,50,.04);
+  }
+  .panel h3{margin:0 0 10px; font-size:15px; font-weight:700;}
+  .panel .lienzo{position:relative; height:260px;}
+  .panel.ancho{grid-column:1 / -1;}
+  .ctrl{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .ctrl label{font-size:13px; color:var(--gris); font-weight:600;}
+  select{
+    font-size:14px; padding:6px 10px; border-radius:7px;
+    border:1px solid var(--linea); background:#fff; color:var(--tinta);
+  }
+  footer{
+    max-width:1180px; margin:0 auto; padding:0 20px 40px;
+    color:var(--gris); font-size:12px;
+  }
+  #aviso{
+    display:none; background:#fff3cd; border:1px solid #ffe69c; color:#664d03;
+    padding:14px 16px; border-radius:10px; margin:20px 0; font-size:14px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Panel de mercados</h1>
+  <div class="meta" id="meta">Cargando datos…</div>
+  <div class="acciones">
+    <a class="btn" id="dl-excel" href="resultados/mercados_reciente.xlsx">⬇ Descargar Excel</a>
+    <a class="btn ghost" id="dl-png" href="resultados/graficos_reciente.png" target="_blank">Ver panel (PNG)</a>
+    <a class="btn ghost" id="dl-png-fx" href="resultados/graficos_divisas_reciente.png" target="_blank">Ver divisas (PNG)</a>
+  </div>
+</header>
+
+<main>
+  <div id="aviso"></div>
+
+  <div class="seccion-titulo">Últimos valores</div>
+  <div class="cards" id="cards"></div>
+
+  <div class="seccion-titulo">Gráficas</div>
+  <div class="grid-graf">
+    <div class="panel">
+      <h3>Henry Hub — gas natural ($/MMBtu)</h3>
+      <div class="lienzo"><canvas id="c-hh"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Petróleo — WTI vs. Brent ($/bbl)</h3>
+      <div class="lienzo"><canvas id="c-oil"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>S&amp;P 500</h3>
+      <div class="lienzo"><canvas id="c-sp"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Inflación EE. UU. — YoY (%)</h3>
+      <div class="lienzo"><canvas id="c-inf"></canvas></div>
+    </div>
+    <div class="panel ancho">
+      <div class="ctrl">
+        <label for="sel-moneda">Tipo de cambio:</label>
+        <select id="sel-moneda"></select>
+        <span style="font-size:12px;color:var(--gris);">unidades por 1 USD</span>
+      </div>
+      <div class="lienzo" style="height:300px;"><canvas id="c-fx"></canvas></div>
+    </div>
+  </div>
+</main>
+
+<footer id="footer"></footer>
+
+<script>
+const DATA_URL = "resultados/datos.json";
+
+function fmtNum(v, fmt){
+  if(v===null || v===undefined) return "—";
+  if(fmt==="0.0%") return (v*100).toFixed(1)+"%";
+  let dec = 2;
+  if(fmt && fmt.indexOf(".")>-1) dec = fmt.split(".")[1].length;
+  return v.toLocaleString("es-MX",{minimumFractionDigits:dec, maximumFractionDigits:dec});
+}
+
+const BASE_OPTS = {
+  responsive:true, maintainAspectRatio:false,
+  interaction:{mode:"index", intersect:false},
+  plugins:{ legend:{display:false}, tooltip:{ callbacks:{} } },
+  elements:{ point:{radius:0}, line:{borderWidth:1.6, tension:.12} },
+  scales:{
+    x:{ ticks:{maxTicksLimit:8, font:{size:11}}, grid:{display:false} },
+    y:{ ticks:{font:{size:11}}, grid:{color:"#eef0f3"} }
+  }
+};
+
+function lineChart(id, labels, datasets, opts){
+  return new Chart(document.getElementById(id), {
+    type:"line",
+    data:{ labels, datasets:datasets.map(d=>Object.assign({spanGaps:true}, d)) },
+    options:Object.assign(JSON.parse(JSON.stringify(BASE_OPTS)), opts||{})
+  });
+}
+
+function mostrarAviso(msg){
+  const a=document.getElementById("aviso");
+  a.style.display="block"; a.innerHTML=msg;
+}
+
+fetch(DATA_URL)
+  .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  .then(d=>render(d))
+  .catch(e=>{
+    document.getElementById("meta").textContent="No se pudieron cargar los datos.";
+    mostrarAviso("<b>No se encontró <code>"+DATA_URL+"</code>.</b><br>"+
+      "Esto funciona cuando la página se abre desde el enlace de GitHub Pages "+
+      "(no con doble clic local, por las restricciones del navegador). "+
+      "Verifica también que el workflow ya haya generado el archivo. ("+e.message+")");
+  });
+
+function render(d){
+  document.getElementById("meta").textContent =
+    "Actualizado: " + d.generado + "  ·  " + d.fuentes;
+  document.getElementById("footer").innerHTML =
+    "Fuentes — " + d.fuentes + ".<br>Generado automáticamente el " + d.generado +
+    ". Las fechas de cada serie pueden diferir según el rezago de publicación de cada fuente.";
+
+  // tarjetas
+  const cards=document.getElementById("cards");
+  d.resumen.forEach(r=>{
+    const el=document.createElement("div"); el.className="card";
+    el.innerHTML="<div class='nombre'>"+r.serie+"</div>"+
+                 "<div class='valor'>"+fmtNum(r.valor, r.fmt)+"</div>"+
+                 "<div class='fecha'>"+r.fecha+"</div>";
+    cards.appendChild(el);
+  });
+
+  const f=d.fechas, s=d.series;
+  if(s["Henry Hub ($/MMBtu)"])
+    lineChart("c-hh", f, [{data:s["Henry Hub ($/MMBtu)"], borderColor:"#C2410C"}]);
+  lineChart("c-oil", f, [
+    {data:s["WTI ($/bbl)"],   borderColor:"#EA580C", label:"WTI"},
+    {data:s["Brent ($/bbl)"], borderColor:"#9A3412", label:"Brent"}
+  ], {plugins:{legend:{display:true, labels:{boxWidth:12, font:{size:11}}}}});
+  if(s["S&P 500"])
+    lineChart("c-sp", f, [{data:s["S&P 500"], borderColor:"#D97706"}]);
+
+  const yoyPct=d.inflacion.yoy.map(v=> v===null?null:v*100);
+  lineChart("c-inf", d.inflacion.fecha, [{data:yoyPct, borderColor:"#B45309"}], {
+    plugins:{ tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? c.parsed.y.toFixed(1)+"%":"—") } } }
+  });
+
+  // divisas con selector
+  const sel=document.getElementById("sel-moneda");
+  d.monedas.forEach(m=>{
+    const o=document.createElement("option"); o.value=m; o.textContent=m; sel.appendChild(o);
+  });
+  const inicial = d.monedas.indexOf("MXN por USD")>-1 ? "MXN por USD" : d.monedas[0];
+  sel.value = inicial;
+  const chartFx = lineChart("c-fx", f, [{data:s[inicial], borderColor:"#EA580C"}]);
+  sel.addEventListener("change", ()=>{
+    chartFx.data.datasets[0].data = s[sel.value];
+    chartFx.update();
+  });
+}
+</script>
+</body>
+</html>
