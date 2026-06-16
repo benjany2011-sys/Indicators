@@ -212,15 +212,12 @@ function ultimosDos(arr){
   return r;
 }
 
-// cambio vs. dato previo disponible
+// cambio vs. dato previo disponible (solo para series de resumen: commodities + divisas)
 function cambio(serie){
-  let arr = DATA.series[serie];
-  let esInfl = false;
-  if(serie==="Inflación YoY (CPI)"){ arr = DATA.inflacion.yoy; esInfl = true; }
+  const arr = DATA.series[serie];
   if(!arr) return null;
   const v = ultimosDos(arr);
   if(v.length<2 || v[1]===0) return null;
-  if(esInfl) return {pp:true, val:(v[0]-v[1])*100};   // puntos porcentuales
   return {pp:false, val:(v[0]-v[1])/v[1]*100};
 }
 
