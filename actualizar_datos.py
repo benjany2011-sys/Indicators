@@ -100,6 +100,20 @@ MONEDAS = {
     "KRW": ("KRW por USD", "#,##0.00"),
 }
 
+# Para cada divisa se agrega además la columna inversa "USD por <ISO>"
+# (cuántos dólares vale 1 unidad de esa moneda = 1 / "X por USD").
+# Se usan 6 decimales porque las inversas van de ~1.16 (EUR) a ~0.0008 (KRW).
+FMT_INV = "#,##0.000000"
+
+
+def _fx_columns():
+    """(nombre, formato) de las columnas de divisas: directa + inversa, en orden."""
+    cols = []
+    for iso, (label, fmt) in MONEDAS.items():
+        cols.append((label, fmt))
+        cols.append((f"USD por {iso}", FMT_INV))
+    return cols
+
 
 def log(msg):
     linea = f"{dt.datetime.now():%Y-%m-%d %H:%M:%S}  {msg}"
@@ -148,14 +162,14 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     """
     Tipo de cambio diario desde Frankfurter (tipos de referencia del BCE).
     base=USD devuelve "unidades por 1 USD" directamente, sin invertir.
-    Pide SOLO las divisas de MONEDAS (quotes) para que la respuesta sea
+    Pide SOLO las divisas de MONEDAS (symbols) para que la respuesta sea
     chica y no se corte; reintenta si la conexión se cae.
     """
     url = "https://api.frankfurter.dev/v2/rates"
     params = {
         "base": "USD",
         "from": desde,
-        "quotes": ",".join(MONEDAS.keys()),   # solo tus 10 divisas
+        "quotes": ",".join(MONEDAS.keys()),   # solo tus 10 divisas (param v2)
     }
     ultimo_error = None
     for intento in range(1, reintentos + 1):
@@ -198,7 +212,15 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     wide = df.pivot_table(index="fecha", columns="quote", values="rate").reset_index()
     wide = wide.rename(columns={c: MONEDAS[c][0] for c in MONEDAS if c in wide.columns})
     wide.columns.name = None
-    return wide
+
+    # agrega la columna inversa (USD por X) junto a cada divisa y ordena
+    orden = ["fecha"]
+    for iso, (label, _fmt) in MONEDAS.items():
+        if label in wide.columns:
+            inv = f"USD por {iso}"
+            wide[inv] = 1.0 / wide[label]
+            orden += [label, inv]
+    return wide[orden]
 
 
 def obtener_inflacion():
@@ -244,7 +266,7 @@ def _formatos_diario():
     """Mapa nombre_de_columna -> formato numérico para la hoja Diario."""
     fmt = {COL_HH: FMT_HH}
     fmt.update({n: f for (n, f) in FRED_DIARIAS.values()})
-    fmt.update({n: f for (n, f) in MONEDAS.values()})
+    fmt.update({n: f for (n, f) in _fx_columns()})
     return fmt
 
 
@@ -252,7 +274,7 @@ def _series_resumen():
     """Lista ordenada (nombre, formato) para la hoja Resumen."""
     s = [(COL_HH, FMT_HH)]
     s += [(n, f) for (n, f) in FRED_DIARIAS.values()]
-    s += [(n, f) for (n, f) in MONEDAS.values()]
+    s += _fx_columns()
     return s
 
 
@@ -403,6 +425,44 @@ def _grafico_excel(ws, fila_enc, n_filas, col_idx, titulo, ancla):
     ws.add_chart(ch, ancla)
 
 
+def _hoja_graficos_fx(wb, ws_diario, diario):
+    """Hoja con una gráfica de línea nativa por divisa (unidades por 1 USD)."""
+    ws = wb.create_sheet("Gráficos FX")
+    ws.sheet_view.showGridLines = False
+    ws.merge_cells("A1:R1")
+    c = ws.cell(row=1, column=1, value="Tipos de cambio  ·  unidades por 1 USD")
+    c.font = Font(name="Calibri", size=14, bold=True, color=BLANCO)
+    c.fill = PatternFill("solid", fgColor=AZUL2)
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 26
+
+    fila_enc = 3                         # fila de encabezados en la hoja Diario
+    n = len(diario)
+    cols = list(diario.columns)
+    anclas_col = ["A", "J"]              # dos columnas de gráficas
+    paso_fila = 14                       # filas entre una gráfica y la de abajo
+    idx = 0
+    for iso, (label, _fmt) in MONEDAS.items():
+        if label not in cols:
+            continue
+        col_idx = cols.index(label) + 1
+        ch = LineChart()
+        ch.title = label
+        ch.height = 6.5
+        ch.width = 12
+        ch.style = 2
+        ch.legend = None
+        datos = Reference(ws_diario, min_col=col_idx, max_col=col_idx,
+                          min_row=fila_enc, max_row=fila_enc + n)
+        cats = Reference(ws_diario, min_col=1,
+                         min_row=fila_enc + 1, max_row=fila_enc + n)
+        ch.add_data(datos, titles_from_data=True)
+        ch.set_categories(cats)
+        fila = 3 + (idx // 2) * paso_fila
+        ws.add_chart(ch, f"{anclas_col[idx % 2]}{fila}")
+        idx += 1
+
+
 def escribir_excel(diario, infl, ruta):
     wb = Workbook()
 
@@ -433,6 +493,9 @@ def escribir_excel(diario, infl, ruta):
     _estilizar_hoja(ws_inf, infl, {"CPI": "#,##0.000", "Inflacion YoY": "0.0%"},
                     "Inflación de EE. UU.  ·  CPI mensual y variación interanual")
 
+    # Hoja 4: una gráfica por divisa
+    _hoja_graficos_fx(wb, ws_dia, diario)
+
     wb.save(ruta)
 
 
@@ -462,7 +525,39 @@ def crear_graficos(diario, infl, ruta_png):
     for a in ax.flat:
         a.grid(True, alpha=0.3)
         a.tick_params(labelsize=8)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.text(0.99, 0.01,
+             f"Fuentes: Henry Hub (EIA); S&P 500, WTI, Brent e inflación (FRED).  "
+             f"Generado {dt.date.today():%Y-%m-%d}.",
+             ha="right", va="bottom", fontsize=7.5, color="#808080")
+    fig.tight_layout(rect=[0, 0.03, 1, 0.96])
+    fig.savefig(ruta_png, dpi=130)
+    plt.close(fig)
+
+
+def crear_graficos_fx(diario, ruta_png):
+    """Panel con una gráfica por divisa (unidades por 1 USD)."""
+    monedas = [label for (label, _f) in MONEDAS.values() if label in diario.columns]
+    if not monedas:
+        return
+    ncols = 2
+    nfilas = (len(monedas) + ncols - 1) // ncols
+    fig, ax = plt.subplots(nfilas, ncols, figsize=(13, 3 * nfilas))
+    fig.suptitle("Tipos de cambio — unidades por 1 USD", fontsize=14, fontweight="bold")
+    d = diario.set_index("fecha")
+    ejes = ax.flat
+    for i, label in enumerate(monedas):
+        a = ejes[i]
+        a.plot(d.index, d[label], color="#2E5496")
+        a.set_title(label, fontsize=10)
+        a.grid(True, alpha=0.3)
+        a.tick_params(labelsize=8)
+    for j in range(len(monedas), len(ejes)):     # apaga ejes sobrantes
+        ejes[j].axis("off")
+    fig.text(0.99, 0.01,
+             f"Fuente: Frankfurter (tipos de referencia del Banco Central Europeo).  "
+             f"Generado {dt.date.today():%Y-%m-%d}.",
+             ha="right", va="bottom", fontsize=7.5, color="#808080")
+    fig.tight_layout(rect=[0, 0.02, 1, 0.97])
     fig.savefig(ruta_png, dpi=130)
     plt.close(fig)
 
@@ -486,11 +581,15 @@ def main():
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
         png_fecha = CARPETA / f"graficos_{HOY}.png"
         png_recie = CARPETA / "graficos_reciente.png"
+        png_fx_fecha = CARPETA / f"graficos_divisas_{HOY}.png"
+        png_fx_recie = CARPETA / "graficos_divisas_reciente.png"
 
         escribir_excel(diario, infl, xlsx_fecha)
         escribir_excel(diario, infl, xlsx_recie)
         crear_graficos(diario, infl, png_fecha)
         crear_graficos(diario, infl, png_recie)
+        crear_graficos_fx(diario, png_fx_fecha)
+        crear_graficos_fx(diario, png_fx_recie)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
