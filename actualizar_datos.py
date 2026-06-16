@@ -1,5 +1,5 @@
 """
-revisar_mercados.py
+actualizar_datos.py
 ===================================================================
 Descarga y consolida en un solo Excel (bien formateado) las series:
 
@@ -8,9 +8,14 @@ Descarga y consolida en un solo Excel (bien formateado) las series:
   - S&P 500 (índice diario)                     -> FRED
   - WTI (petróleo, spot diario)                 -> FRED
   - Brent (petróleo, spot diario)               -> FRED
-  - Tipo de cambio de 10 divisas vs. USD        -> FRED
+  - Tipo de cambio de 10 divisas vs. USD        -> Frankfurter (BCE)
 
 Todas las series diarias arrancan en 2021-01-01.
+
+Las divisas vienen de Frankfurter (tipos de referencia del Banco Central
+Europeo). Con base=USD salen ya como "unidades por 1 USD" (18 pesos, 157
+yenes, etc.), sin necesidad de invertir, y se publican el mismo día hábil
+(~16:00 hora de Europa central), más fresco que FRED.
 
 Cada vez que corre crea (junto al script) una carpeta `resultados` con:
   - mercados_AAAA-MM-DD.xlsx  y  mercados_reciente.xlsx
@@ -19,11 +24,16 @@ Cada vez que corre crea (junto al script) una carpeta `resultados` con:
 
 -------------------------------------------------------------------
 Requisitos (una sola vez):
-    pip install requests pandas matplotlib openpyxl python-dotenv
+    pip install requests pandas matplotlib openpyxl
 
-Necesita un archivo `.env` en la misma carpeta, con tus dos llaves:
-    EIA_API_KEY=tu_llave_de_eia
-    FRED_API_KEY=tu_llave_de_fred
+Llaves (EIA y FRED):
+  - En tu PC: archivo `.env` en la misma carpeta, con
+        EIA_API_KEY=tu_llave_de_eia
+        FRED_API_KEY=tu_llave_de_fred
+    (necesita además `pip install python-dotenv`)
+  - En GitHub Actions: como Secrets del repo; el workflow las pasa
+    como variables de entorno. No hace falta .env ni python-dotenv.
+  Frankfurter no necesita llave.
 ===================================================================
 """
 
@@ -38,7 +48,13 @@ import matplotlib
 matplotlib.use("Agg")                 # sin ventana, solo guarda PNG
 import matplotlib.pyplot as plt
 
-from dotenv import load_dotenv
+# python-dotenv es opcional: en tu PC lee el .env; en GitHub Actions
+# las llaves vienen de los Secrets y este import simplemente se omite.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ModuleNotFoundError:
+    pass
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -48,7 +64,6 @@ from openpyxl.chart import LineChart, Reference
 # ------------------------------------------------------------------
 # 0) Configuración
 # ------------------------------------------------------------------
-load_dotenv()
 EIA_API_KEY = os.getenv("EIA_API_KEY")
 FRED_API_KEY = os.getenv("FRED_API_KEY")
 
@@ -59,29 +74,31 @@ CARPETA.mkdir(exist_ok=True)
 HOY = dt.date.today().isoformat()
 LOG = CARPETA / "registro.log"
 
-# Series diarias de FRED: id -> (nombre de columna, ¿invertir?, formato numérico)
-# "invertir" se usa para divisas que FRED cotiza como USD por unidad extranjera
-# (EUR, GBP, AUD). Al invertir las dejamos todas como "moneda por 1 USD".
-FRED_DIARIAS = {
-    "SP500":        ("S&P 500",        False, "#,##0.00"),
-    "DCOILWTICO":   ("WTI ($/bbl)",    False, "#,##0.00"),
-    "DCOILBRENTEU": ("Brent ($/bbl)",  False, "#,##0.00"),
-    # --- divisas (todas quedan expresadas como: unidades por 1 USD) ---
-    "DEXUSEU":      ("EUR por USD",    True,  "#,##0.0000"),
-    "DEXJPUS":      ("JPY por USD",    False, "#,##0.00"),
-    "DEXCHUS":      ("CNY por USD",    False, "#,##0.0000"),
-    "DEXUSUK":      ("GBP por USD",    True,  "#,##0.0000"),
-    "DEXMXUS":      ("MXN por USD",    False, "#,##0.0000"),
-    "DEXCAUS":      ("CAD por USD",    False, "#,##0.0000"),
-    "DEXSZUS":      ("CHF por USD",    False, "#,##0.0000"),
-    "DEXUSAL":      ("AUD por USD",    True,  "#,##0.0000"),
-    "DEXINUS":      ("INR por USD",    False, "#,##0.00"),
-    "DEXKOUS":      ("KRW por USD",    False, "#,##0.00"),
-}
-
-# Henry Hub en $/MMBtu se agrega aparte (viene de EIA)
+# Henry Hub en $/MMBtu (viene de EIA)
 COL_HH = "Henry Hub ($/MMBtu)"
 FMT_HH = "#,##0.00"
+
+# Series diarias de FRED: id -> (nombre de columna, formato numérico)
+FRED_DIARIAS = {
+    "SP500":        ("S&P 500",       "#,##0.00"),
+    "DCOILWTICO":   ("WTI ($/bbl)",   "#,##0.00"),
+    "DCOILBRENTEU": ("Brent ($/bbl)", "#,##0.00"),
+}
+
+# Divisas vía Frankfurter (BCE). base=USD -> "unidades por 1 USD".
+# código ISO -> (nombre de columna, formato numérico)
+MONEDAS = {
+    "EUR": ("EUR por USD", "#,##0.0000"),
+    "JPY": ("JPY por USD", "#,##0.00"),
+    "CNY": ("CNY por USD", "#,##0.0000"),
+    "GBP": ("GBP por USD", "#,##0.0000"),
+    "MXN": ("MXN por USD", "#,##0.0000"),
+    "CAD": ("CAD por USD", "#,##0.0000"),
+    "CHF": ("CHF por USD", "#,##0.0000"),
+    "AUD": ("AUD por USD", "#,##0.0000"),
+    "INR": ("INR por USD", "#,##0.00"),
+    "KRW": ("KRW por USD", "#,##0.00"),
+}
 
 
 def log(msg):
@@ -123,9 +140,46 @@ def obtener_fred(series_id, observation_start=FECHA_INICIO):
     df = pd.DataFrame(obs)[["date", "value"]]
     df.columns = ["fecha", "valor"]
     df["fecha"] = pd.to_datetime(df["fecha"])
-    # FRED marca los faltantes con "."
     df["valor"] = pd.to_numeric(df["valor"].replace(".", None), errors="coerce")
     return df
+
+
+def obtener_fx(desde=FECHA_INICIO):
+    """
+    Tipo de cambio diario desde Frankfurter (tipos de referencia del BCE).
+    base=USD devuelve "unidades por 1 USD" directamente, sin invertir.
+    Sin 'from' devolvería solo el último dato; aquí pedimos desde 2021.
+    """
+    url = "https://api.frankfurter.dev/v2/rates"
+    params = {"base": "USD", "from": desde}
+    r = requests.get(url, params=params, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    # Frankfurter v2 devuelve una lista de registros {date, base, quote, rate}.
+    # Dejamos el parser tolerante por si el rango llega como dict anidado.
+    if isinstance(data, list):
+        df = pd.DataFrame(data)
+    elif isinstance(data, dict) and "rates" in data:
+        rates = data["rates"]
+        registros = []
+        if rates and all(isinstance(v, dict) for v in rates.values()):
+            for fecha, d in rates.items():
+                for cur, val in d.items():
+                    registros.append({"date": fecha, "quote": cur, "rate": val})
+        else:
+            for cur, val in rates.items():
+                registros.append({"date": data.get("date"), "quote": cur, "rate": val})
+        df = pd.DataFrame(registros)
+    else:
+        raise ValueError("Respuesta de Frankfurter con formato inesperado")
+
+    df = df[df["quote"].isin(MONEDAS)].copy()
+    df["fecha"] = pd.to_datetime(df["date"])
+    df["rate"] = pd.to_numeric(df["rate"], errors="coerce")
+    wide = df.pivot_table(index="fecha", columns="quote", values="rate").reset_index()
+    wide = wide.rename(columns={c: MONEDAS[c][0] for c in MONEDAS if c in wide.columns})
+    wide.columns.name = None
+    return wide
 
 
 def obtener_inflacion():
@@ -143,13 +197,14 @@ def construir_diario():
     log("Descargando Henry Hub (EIA)...")
     diario = obtener_henry_hub()
 
-    for sid, (nombre, invertir, _fmt) in FRED_DIARIAS.items():
+    for sid, (nombre, _fmt) in FRED_DIARIAS.items():
         log(f"Descargando {nombre} (FRED:{sid})...")
-        s = obtener_fred(sid)
-        if invertir:
-            s["valor"] = 1.0 / s["valor"]
-        s = s.rename(columns={"valor": nombre})
+        s = obtener_fred(sid).rename(columns={"valor": nombre})
         diario = diario.merge(s, on="fecha", how="outer")
+
+    log("Descargando divisas (Frankfurter/BCE)...")
+    fx = obtener_fx()
+    diario = diario.merge(fx, on="fecha", how="outer")
 
     diario = diario[diario["fecha"] >= FECHA_INICIO].sort_values("fecha")
     return diario.reset_index(drop=True)
@@ -164,6 +219,22 @@ AZUL2  = "2E5496"   # títulos
 GRIS   = "F2F2F2"   # franjas alternas
 BLANCO = "FFFFFF"
 borde_fino = Border(*(Side(style="thin", color="D9D9D9"),) * 4)
+
+
+def _formatos_diario():
+    """Mapa nombre_de_columna -> formato numérico para la hoja Diario."""
+    fmt = {COL_HH: FMT_HH}
+    fmt.update({n: f for (n, f) in FRED_DIARIAS.values()})
+    fmt.update({n: f for (n, f) in MONEDAS.values()})
+    return fmt
+
+
+def _series_resumen():
+    """Lista ordenada (nombre, formato) para la hoja Resumen."""
+    s = [(COL_HH, FMT_HH)]
+    s += [(n, f) for (n, f) in FRED_DIARIAS.values()]
+    s += [(n, f) for (n, f) in MONEDAS.values()]
+    return s
 
 
 def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
@@ -183,7 +254,7 @@ def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_col)
     c = ws.cell(row=2, column=1,
                 value=f"Generado: {dt.datetime.now():%Y-%m-%d %H:%M}  ·  "
-                      f"Fuentes: EIA y FRED  ·  Inicio: {FECHA_INICIO}")
+                      f"Fuentes: EIA, FRED y Frankfurter (BCE)  ·  Inicio: {FECHA_INICIO}")
     c.font = Font(name="Calibri", size=9, italic=True, color="808080")
     c.alignment = Alignment(horizontal="left", indent=1)
 
@@ -254,10 +325,10 @@ def _hoja_resumen(ws, diario, infl):
         cell.alignment = Alignment(horizontal="center")
         cell.border = borde_fino
 
-    # arma lista (nombre, formato) en el orden deseado
-    series = [(COL_HH, FMT_HH)] + [(n, f) for (n, _i, f) in FRED_DIARIAS.values()]
     r = 5
-    for nombre, fmt in series:
+    for nombre, fmt in _series_resumen():
+        if nombre not in diario.columns:
+            continue
         sub = diario[["fecha", nombre]].dropna()
         if sub.empty:
             continue
@@ -277,10 +348,11 @@ def _hoja_resumen(ws, diario, infl):
         v3.alignment = Alignment(horizontal="center")
         r += 1
 
-    # inflación
+    # inflación (mensual)
     inf = infl.dropna(subset=["Inflacion YoY"])
     if not inf.empty:
         ult = inf.iloc[-1]
+        franja = PatternFill("solid", fgColor=GRIS) if (r % 2 == 0) else None
         v1 = ws.cell(row=r, column=1, value="Inflación YoY (CPI)")
         v2 = ws.cell(row=r, column=2, value=float(ult["Inflacion YoY"]))
         v3 = ws.cell(row=r, column=3, value=ult["fecha"].to_pydatetime())
@@ -288,6 +360,8 @@ def _hoja_resumen(ws, diario, infl):
         v3.number_format = "yyyy-mm-dd"
         for cell in (v1, v2, v3):
             cell.border = borde_fino
+            if franja:
+                cell.fill = franja
 
     ws.column_dimensions["A"].width = 24
     ws.column_dimensions["B"].width = 16
@@ -320,21 +394,20 @@ def escribir_excel(diario, infl, ruta):
 
     # Hoja 2: Diario
     ws_dia = wb.create_sheet("Diario")
-    fmt_diario = {COL_HH: FMT_HH}
-    fmt_diario.update({n: f for (n, _i, f) in FRED_DIARIAS.values()})
-    _estilizar_hoja(ws_dia, diario, fmt_diario,
+    _estilizar_hoja(ws_dia, diario, _formatos_diario(),
                     "Series diarias  ·  Henry Hub, S&P 500, WTI, Brent y divisas")
 
-    # un par de gráficos nativos para Henry Hub y S&P 500
+    # gráficos nativos para Henry Hub y S&P 500
     fila_enc = 3
     n = len(diario)
     cols = list(diario.columns)
+    ancla_col = get_column_letter(len(cols) + 2)
     if COL_HH in cols:
         _grafico_excel(ws_dia, fila_enc, n, cols.index(COL_HH) + 1,
-                       COL_HH, f"{get_column_letter(len(cols) + 2)}3")
+                       COL_HH, f"{ancla_col}3")
     if "S&P 500" in cols:
         _grafico_excel(ws_dia, fila_enc, n, cols.index("S&P 500") + 1,
-                       "S&P 500", f"{get_column_letter(len(cols) + 2)}18")
+                       "S&P 500", f"{ancla_col}18")
 
     # Hoja 3: Inflación
     ws_inf = wb.create_sheet("Inflación")
@@ -380,7 +453,8 @@ def crear_graficos(diario, infl, ruta_png):
 # ------------------------------------------------------------------
 def main():
     if not EIA_API_KEY or not FRED_API_KEY:
-        log("ERROR: faltan llaves. Revisa el archivo .env (EIA_API_KEY y FRED_API_KEY).")
+        log("ERROR: faltan llaves EIA_API_KEY y/o FRED_API_KEY "
+            "(.env en tu PC, o Secrets en GitHub Actions).")
         sys.exit(1)
 
     log("===== Inicio =====")
@@ -399,9 +473,11 @@ def main():
         crear_graficos(diario, infl, png_fecha)
         crear_graficos(diario, infl, png_recie)
 
-        # resumen en consola/log
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
+        if "MXN por USD" in diario.columns:
+            ult_mxn = diario.dropna(subset=["MXN por USD"]).iloc[-1]
+            log(f"Peso más reciente: {ult_mxn['MXN por USD']:.4f} MXN/USD ({ult_mxn['fecha'].date()})")
         inf = infl.dropna(subset=['Inflacion YoY']).iloc[-1]
         log(f"Inflación YoY más reciente: {inf['Inflacion YoY']*100:.1f}% ({inf['fecha'].date()})")
         log(f"Excel guardado en: {xlsx_recie}")
@@ -413,4 +489,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
