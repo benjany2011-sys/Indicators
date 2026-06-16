@@ -148,14 +148,14 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     """
     Tipo de cambio diario desde Frankfurter (tipos de referencia del BCE).
     base=USD devuelve "unidades por 1 USD" directamente, sin invertir.
-    Pide SOLO las divisas de MONEDAS (symbols) para que la respuesta sea
+    Pide SOLO las divisas de MONEDAS (quotes) para que la respuesta sea
     chica y no se corte; reintenta si la conexión se cae.
     """
     url = "https://api.frankfurter.dev/v2/rates"
     params = {
         "base": "USD",
         "from": desde,
-        "symbols": ",".join(MONEDAS.keys()),   # solo tus 10 divisas
+        "quotes": ",".join(MONEDAS.keys()),   # solo tus 10 divisas
     }
     ultimo_error = None
     for intento in range(1, reintentos + 1):
