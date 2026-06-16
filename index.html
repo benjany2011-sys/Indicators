@@ -122,7 +122,7 @@
 <nav class="tabs" id="tabs">
   <button class="tab" data-tab="divisas">Divisas</button>
   <button class="tab" data-tab="commodities">Commodities</button>
-  <button class="tab" data-tab="inflacion">Inflación</button>
+  <button class="tab" data-tab="macro">Macro EE. UU.</button>
   <button class="tab" data-tab="archivos">Archivos</button>
 </nav>
 
@@ -158,14 +158,12 @@
     </div>
   </section>
 
-  <!-- INFLACIÓN -->
-  <section id="sec-inflacion">
-    <div class="seccion-titulo">Inflación EE. UU. — último valor</div>
-    <div class="cards" id="cards-inflacion"></div>
+  <!-- MACRO EE. UU. -->
+  <section id="sec-macro">
+    <div class="seccion-titulo">Macro EE. UU. — últimos valores</div>
+    <div class="cards" id="cards-macro"></div>
     <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf">
-      <div class="panel ancho"><h3>Inflación interanual (YoY, %)</h3><div class="lienzo alto"><canvas id="c-inf"></canvas></div></div>
-    </div>
+    <div class="grid-graf" id="graf-macro"></div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -268,6 +266,44 @@ function lineChart(id, labels, datasets, opts){
   charts[id]=c; return c;
 }
 
+function ultimosDosMacro(valores){
+  const r=[];
+  for(let i=valores.length-1;i>=0 && r.length<2;i--){ if(valores[i]!==null && valores[i]!==undefined) r.push(valores[i]); }
+  return r;
+}
+
+function construirMacro(){
+  const cont=document.getElementById("cards-macro");
+  const graf=document.getElementById("graf-macro");
+  (DATA.macro||[]).forEach((ind, k)=>{
+    const v = ultimosDosMacro(ind.valores);
+    const ultVal = v.length ? v[0]*ind.escala : null;
+    let delta=null;
+    if(v.length>=2) delta={pp:true, val:(v[0]-v[1])*ind.escala};
+    const ultFecha = ind.fecha.length ? ind.fecha[ind.fecha.length-1] : "";
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML =
+      "<div class='nombre'>"+ind.nombre+"</div>"+
+      "<div class='valor-row'><span class='valor'>"+
+        (ultVal===null?"—":ultVal.toFixed(1)+"%")+"</span>"+htmlDelta(delta)+"</div>"+
+      "<div class='fecha'>"+ultFecha+"</div>";
+    cont.appendChild(card);
+    const panel=document.createElement("div"); panel.className="panel ancho";
+    panel.innerHTML="<h3>"+ind.nombre+" (%)</h3><div class='lienzo'><canvas id='c-macro-"+k+"'></canvas></div>";
+    graf.appendChild(panel);
+  });
+}
+
+function graficarMacro(){
+  (DATA.macro||[]).forEach((ind, k)=>{
+    const vals = ind.valores.map(x=> x===null?null:x*ind.escala);
+    lineChart("c-macro-"+k, ind.fecha, [{data:vals, borderColor:"#FF9D2E"}], {
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? c.parsed.y.toFixed(1)+"%":"—") } } }
+    });
+  });
+}
+
 function construirGraficas(tab){
   const f=DATA.fechas, s=DATA.series;
   if(tab==="commodities"){
@@ -278,12 +314,8 @@ function construirGraficas(tab){
     ], {plugins:{legend:{display:true, labels:{boxWidth:12, font:{size:11}, color:"#cfcfcf"}}}});
     if(s["S&P 500"]) lineChart("c-sp", f, [{data:s["S&P 500"], borderColor:"#B8BCC0"}]);
   }
-  if(tab==="inflacion"){
-    const yoyPct=DATA.inflacion.yoy.map(v=> v===null?null:v*100);
-    lineChart("c-inf", DATA.inflacion.fecha, [{data:yoyPct, borderColor:"#FF9D2E"}], {
-      plugins:{ legend:{display:false},
-        tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? c.parsed.y.toFixed(1)+"%":"—") } } }
-    });
+  if(tab==="macro"){
+    graficarMacro();
   }
   if(tab==="divisas"){
     const sel=document.getElementById("sel-moneda");
@@ -322,15 +354,14 @@ function render(d){
     ". El % junto a cada cifra compara el último dato con el anterior disponible; "+
     "las fechas pueden diferir según el rezago de cada fuente.";
 
-  // repartir tarjetas por sección
+  // repartir tarjetas por sección (resumen = commodities + divisas)
   const cDiv=document.getElementById("cards-divisas");
   const cCom=document.getElementById("cards-commodities");
-  const cInf=document.getElementById("cards-inflacion");
   d.resumen.forEach(r=>{
-    if(r.serie==="Inflación YoY (CPI)") cInf.appendChild(tarjeta(r));
-    else if(esFX(r.serie)) cDiv.appendChild(tarjeta(r));
+    if(esFX(r.serie)) cDiv.appendChild(tarjeta(r));
     else cCom.appendChild(tarjeta(r));
   });
+  construirMacro();   // tarjetas + paneles de Macro EE. UU.
 
   // pestañas
   document.querySelectorAll(".tab").forEach(b=> b.addEventListener("click", ()=> mostrarTab(b.dataset.tab)));
