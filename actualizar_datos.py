@@ -234,6 +234,28 @@ def obtener_inflacion():
     return df
 
 
+def obtener_macro():
+    """
+    Indicadores macro de EE. UU. (FRED), en una sola tabla mensual:
+      - Inflación YoY (CPI)            fracción (0.03 = 3%)
+      - Desempleo                      % (UNRATE), mensual
+      - PIB real (crec. anualizado)    % (A191RL1Q225SBEA), trimestral
+    El PIB es trimestral, así que solo tiene dato en meses de fin de trimestre;
+    el resto de filas queda en blanco, lo cual es normal.
+    """
+    infl = obtener_inflacion()[["fecha", "CPI", "Inflacion YoY"]]
+
+    log("Descargando desempleo (FRED:UNRATE)...")
+    des = obtener_fred("UNRATE").rename(columns={"valor": "Desempleo"})
+
+    log("Descargando PIB (FRED:A191RL1Q225SBEA)...")
+    pib = obtener_fred("A191RL1Q225SBEA").rename(columns={"valor": "PIB crec."})
+
+    macro = infl.merge(des, on="fecha", how="outer").merge(pib, on="fecha", how="outer")
+    macro = macro[macro["fecha"] >= FECHA_INICIO].sort_values("fecha").reset_index(drop=True)
+    return macro
+
+
 def construir_diario():
     """Une todas las series diarias en una sola tabla por fecha."""
     log("Descargando Henry Hub (EIA)...")
@@ -390,20 +412,34 @@ def _hoja_resumen(ws, diario, infl):
         v3.alignment = Alignment(horizontal="center")
         r += 1
 
-    # inflación (mensual)
-    inf = infl.dropna(subset=["Inflacion YoY"])
-    if not inf.empty:
-        ult = inf.iloc[-1]
+    # macro mensual/trimestral
+    macro = infl
+    filas_macro = [
+        ("Inflación YoY (CPI)", "Inflacion YoY", "0.0%"),
+        ("Desempleo (%)",       "Desempleo",     '0.0"%"'),
+        ("PIB real (crec. anual.)", "PIB crec.",  '0.0"%"'),
+    ]
+    for etiqueta, col, fmt in filas_macro:
+        if col not in macro.columns:
+            continue
+        sub = macro[["fecha", col]].dropna()
+        if sub.empty:
+            continue
+        ult = sub.iloc[-1]
         franja = PatternFill("solid", fgColor=GRIS) if (r % 2 == 0) else None
-        v1 = ws.cell(row=r, column=1, value="Inflación YoY (CPI)")
-        v2 = ws.cell(row=r, column=2, value=float(ult["Inflacion YoY"]))
+        v1 = ws.cell(row=r, column=1, value=etiqueta)
+        v2 = ws.cell(row=r, column=2, value=float(ult[col]))
         v3 = ws.cell(row=r, column=3, value=ult["fecha"].to_pydatetime())
-        v2.number_format = "0.0%"
+        v2.number_format = fmt
         v3.number_format = "yyyy-mm-dd"
         for cell in (v1, v2, v3):
             cell.border = borde_fino
             if franja:
                 cell.fill = franja
+        v1.alignment = Alignment(horizontal="left")
+        v2.alignment = Alignment(horizontal="right")
+        v3.alignment = Alignment(horizontal="center")
+        r += 1
 
     ws.column_dimensions["A"].width = 24
     ws.column_dimensions["B"].width = 16
@@ -489,10 +525,12 @@ def escribir_excel(diario, infl, ruta):
         _grafico_excel(ws_dia, fila_enc, n, cols.index("S&P 500") + 1,
                        "S&P 500", f"{ancla_col}18")
 
-    # Hoja 3: Inflación
-    ws_inf = wb.create_sheet("Inflación")
-    _estilizar_hoja(ws_inf, infl, {"CPI": "#,##0.000", "Inflacion YoY": "0.0%"},
-                    "Inflación de EE. UU.  ·  CPI mensual y variación interanual")
+    # Hoja 3: Macro EE. UU.
+    ws_mac = wb.create_sheet("Macro EE. UU.")
+    _estilizar_hoja(ws_mac, infl,
+                    {"CPI": "#,##0.000", "Inflacion YoY": "0.0%",
+                     "Desempleo": '0.0"%"', "PIB crec.": '0.0"%"'},
+                    "Macro EE. UU.  ·  inflación, desempleo y PIB")
 
     # Hoja 4: una gráfica por divisa
     _hoja_graficos_fx(wb, ws_dia, diario)
@@ -503,34 +541,45 @@ def escribir_excel(diario, infl, ruta):
 # ------------------------------------------------------------------
 # 3) Gráficos PNG (panel resumen)
 # ------------------------------------------------------------------
-def crear_graficos(diario, infl, ruta_png):
-    fig, ax = plt.subplots(2, 2, figsize=(13, 8))
-    fig.suptitle("Mercados — resumen", fontsize=14, fontweight="bold")
+def crear_graficos(diario, macro, ruta_png):
+    fig, ax = plt.subplots(3, 2, figsize=(13, 12))
+    fig.suptitle("Mercados y macro — resumen", fontsize=14, fontweight="bold")
 
     d = diario.set_index("fecha")
     if COL_HH in d:
-        ax[0, 0].plot(d.index, d[COL_HH], color="#1F3864")
+        ax[0, 0].plot(d.index, d[COL_HH], color="#FF7A18")
         ax[0, 0].set_title(COL_HH)
-    for col, c in [("WTI ($/bbl)", "#2E5496"), ("Brent ($/bbl)", "#C00000")]:
+    for col, c in [("WTI ($/bbl)", "#FF7A18"), ("Brent ($/bbl)", "#E62315")]:
         if col in d:
             ax[0, 1].plot(d.index, d[col], label=col, color=c)
     ax[0, 1].set_title("Petróleo: WTI vs. Brent")
     ax[0, 1].legend(fontsize=8)
     if "S&P 500" in d:
-        ax[1, 0].plot(d.index, d["S&P 500"], color="#548235")
+        ax[1, 0].plot(d.index, d["S&P 500"], color="#888c92")
         ax[1, 0].set_title("S&P 500")
-    if not infl.empty:
-        ai = infl.set_index("fecha")["Inflacion YoY"] * 100
+
+    m = macro.set_index("fecha")
+    if "Inflacion YoY" in m:
+        ai = m["Inflacion YoY"].dropna() * 100
         ax[1, 1].plot(ai.index, ai.values, color="#BF8F00")
         ax[1, 1].set_title("Inflación YoY (%)")
+    if "Desempleo" in m:
+        de = m["Desempleo"].dropna()
+        ax[2, 0].plot(de.index, de.values, color="#2E5496")
+        ax[2, 0].set_title("Desempleo (%)")
+    if "PIB crec." in m:
+        pb = m["PIB crec."].dropna()
+        ax[2, 1].plot(pb.index, pb.values, color="#548235", marker="o", markersize=3)
+        ax[2, 1].set_title("PIB real — crec. anualizado (%)")
+
     for a in ax.flat:
         a.grid(True, alpha=0.3)
         a.tick_params(labelsize=8)
     fig.text(0.99, 0.01,
-             f"Fuentes: Henry Hub (EIA); S&P 500, WTI, Brent e inflación (FRED).  "
-             f"Generado {dt.date.today():%Y-%m-%d}.",
+             f"Fuentes: Henry Hub (EIA); S&P 500, WTI, Brent, inflación, "
+             f"desempleo y PIB (FRED).  Generado {dt.date.today():%Y-%m-%d}.",
              ha="right", va="bottom", fontsize=7.5, color="#808080")
-    fig.tight_layout(rect=[0, 0.03, 1, 0.96])
+    fig.tight_layout(rect=[0, 0.02, 1, 0.97])
     fig.savefig(ruta_png, dpi=130)
     plt.close(fig)
 
@@ -566,7 +615,7 @@ def crear_graficos_fx(diario, ruta_png):
 # ------------------------------------------------------------------
 # 3b) Exportar datos a JSON (para el panel web / GitHub Pages)
 # ------------------------------------------------------------------
-def escribir_json(diario, infl, ruta):
+def escribir_json(diario, macro, ruta):
     """Vuelca los datos en un JSON compacto que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -587,24 +636,33 @@ def escribir_json(diario, infl, ruta):
         resumen.append({"serie": nombre, "valor": round(float(ult[nombre]), 6),
                         "fecha": ult["fecha"].strftime("%Y-%m-%d"), "fmt": fmt})
 
-    inf = infl.dropna(subset=["Inflacion YoY"])
-    if not inf.empty:
-        u = inf.iloc[-1]
-        resumen.append({"serie": "Inflación YoY (CPI)",
-                        "valor": round(float(u["Inflacion YoY"]), 5),
-                        "fecha": u["fecha"].strftime("%Y-%m-%d"), "fmt": "0.0%"})
+    # indicadores macro (mensuales/trimestrales). 'escala' lleva el valor a %.
+    macro_def = [
+        ("Inflación YoY (CPI)",        "Inflacion YoY", 100),
+        ("Desempleo",                  "Desempleo",       1),
+        ("PIB real (crec. anualizado)", "PIB crec.",      1),
+    ]
+    macro_out = []
+    for nombre, col, escala in macro_def:
+        if col not in macro.columns:
+            continue
+        sub = macro[["fecha", col]].dropna()
+        if sub.empty:
+            continue
+        macro_out.append({
+            "nombre": nombre, "escala": escala,
+            "fecha": sub["fecha"].dt.strftime("%Y-%m-%d").tolist(),
+            "valores": limpia(sub[col], 5),
+        })
 
     obj = {
         "generado": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación: FRED · "
-                   "Divisas: Frankfurter (BCE)",
+        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB: "
+                   "FRED · Divisas: Frankfurter (BCE)",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
         "series": series,
         "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
-        "inflacion": {
-            "fecha": infl["fecha"].dt.strftime("%Y-%m-%d").tolist(),
-            "yoy": limpia(infl["Inflacion YoY"], 5),
-        },
+        "macro": macro_out,
         "resumen": resumen,
     }
     with open(ruta, "w", encoding="utf-8") as f:
@@ -623,8 +681,8 @@ def main():
     log("===== Inicio =====")
     try:
         diario = construir_diario()
-        log("Descargando inflación (FRED:CPIAUCSL)...")
-        infl = obtener_inflacion()
+        log("Descargando indicadores macro (FRED)...")
+        macro = obtener_macro()
 
         xlsx_fecha = CARPETA / f"mercados_{HOY}.xlsx"
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
@@ -633,22 +691,22 @@ def main():
         png_fx_fecha = CARPETA / f"graficos_divisas_{HOY}.png"
         png_fx_recie = CARPETA / "graficos_divisas_reciente.png"
 
-        escribir_excel(diario, infl, xlsx_fecha)
-        escribir_excel(diario, infl, xlsx_recie)
-        crear_graficos(diario, infl, png_fecha)
-        crear_graficos(diario, infl, png_recie)
+        escribir_excel(diario, macro, xlsx_fecha)
+        escribir_excel(diario, macro, xlsx_recie)
+        crear_graficos(diario, macro, png_fecha)
+        crear_graficos(diario, macro, png_recie)
         crear_graficos_fx(diario, png_fx_fecha)
         crear_graficos_fx(diario, png_fx_recie)
 
         # datos para el panel web (GitHub Pages)
-        escribir_json(diario, infl, CARPETA / "datos.json")
+        escribir_json(diario, macro, CARPETA / "datos.json")
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
         if "MXN por USD" in diario.columns:
             ult_mxn = diario.dropna(subset=["MXN por USD"]).iloc[-1]
             log(f"Peso más reciente: {ult_mxn['MXN por USD']:.4f} MXN/USD ({ult_mxn['fecha'].date()})")
-        inf = infl.dropna(subset=['Inflacion YoY']).iloc[-1]
+        inf = macro.dropna(subset=['Inflacion YoY']).iloc[-1]
         log(f"Inflación YoY más reciente: {inf['Inflacion YoY']*100:.1f}% ({inf['fecha'].date()})")
         log(f"Excel guardado en: {xlsx_recie}")
         log("===== Fin OK =====")
