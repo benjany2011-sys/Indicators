@@ -144,17 +144,36 @@ def obtener_fred(series_id, observation_start=FECHA_INICIO):
     return df
 
 
-def obtener_fx(desde=FECHA_INICIO):
+def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     """
     Tipo de cambio diario desde Frankfurter (tipos de referencia del BCE).
     base=USD devuelve "unidades por 1 USD" directamente, sin invertir.
-    Sin 'from' devolvería solo el último dato; aquí pedimos desde 2021.
+    Pide SOLO las divisas de MONEDAS (symbols) para que la respuesta sea
+    chica y no se corte; reintenta si la conexión se cae.
     """
     url = "https://api.frankfurter.dev/v2/rates"
-    params = {"base": "USD", "from": desde}
-    r = requests.get(url, params=params, timeout=60)
-    r.raise_for_status()
-    data = r.json()
+    params = {
+        "base": "USD",
+        "from": desde,
+        "symbols": ",".join(MONEDAS.keys()),   # solo tus 10 divisas
+    }
+    ultimo_error = None
+    for intento in range(1, reintentos + 1):
+        try:
+            r = requests.get(url, params=params, timeout=120)
+            r.raise_for_status()
+            data = r.json()
+            break
+        except (requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            ultimo_error = e
+            log(f"  Frankfurter falló (intento {intento}/{reintentos}): {e}")
+            if intento == reintentos:
+                raise
+    else:
+        raise ultimo_error
+
     # Frankfurter v2 devuelve una lista de registros {date, base, quote, rate}.
     # Dejamos el parser tolerante por si el rango llega como dict anidado.
     if isinstance(data, list):
