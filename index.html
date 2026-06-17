@@ -269,10 +269,27 @@ const BASE_OPTS = {
   }
 };
 function lineChart(id, labels, datasets, opts){
+  const options = Object.assign(JSON.parse(JSON.stringify(BASE_OPTS)), opts||{});
+  // Reparte ~8 etiquetas parejas en el eje X pero garantiza que la ÚLTIMA
+  // fecha siempre se muestre (si no, Chart.js a veces corta antes de 2026).
+  options.scales = options.scales || {};
+  options.scales.x = options.scales.x || {};
+  options.scales.x.ticks = options.scales.x.ticks || {};
+  options.scales.x.ticks.autoSkip = false;
+  options.scales.x.ticks.maxRotation = 0;
+  options.scales.x.afterBuildTicks = (axis)=>{
+    const n = axis.chart.data.labels.length;
+    if(n <= 1) return;
+    const max = 8, paso = (n - 1) / (max - 1), idx = [];
+    for(let i=0;i<max;i++) idx.push(Math.round(i*paso));
+    const uniq = [...new Set(idx)].sort((a,b)=>a-b);
+    if(uniq[uniq.length-1] !== n-1) uniq.push(n-1);
+    axis.ticks = uniq.map(v=>({value:v}));
+  };
   const c = new Chart(document.getElementById(id), {
     type:"line",
     data:{ labels, datasets:datasets.map(d=>Object.assign({spanGaps:true}, d)) },
-    options:Object.assign(JSON.parse(JSON.stringify(BASE_OPTS)), opts||{})
+    options
   });
   charts[id]=c; return c;
 }
