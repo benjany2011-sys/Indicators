@@ -4,9 +4,9 @@ name: Actualizar datos diarios
 # Cuándo se ejecuta
 on:
   schedule:
-    # Todos los días a las 13:00 UTC (aprox. 7-8 a.m. hora de Texas, según horario de verano).
+    # Todos los días a las 16:00 UTC (aprox. 10-11 a.m. hora de Texas, según horario de verano).
     # Para cambiar la hora, ajusta el número. GitHub usa hora UTC.
-    - cron: "0 13 * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:        # permite también correrlo a mano con un botón
 
 # Permiso para que el robot pueda guardar los resultados en el repositorio
