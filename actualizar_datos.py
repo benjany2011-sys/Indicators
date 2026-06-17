@@ -686,8 +686,10 @@ def escribir_json(diario, macro, ruta):
             "valores": limpia(sub[col], 5),
         })
 
+    ahora_utc = dt.datetime.now(dt.timezone.utc)
     obj = {
-        "generado": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generado": ahora_utc.strftime("%Y-%m-%d %H:%M UTC"),
+        "generado_iso": ahora_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB: "
                    "FRED · Divisas: Frankfurter (BCE)",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
