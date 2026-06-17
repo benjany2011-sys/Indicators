@@ -118,6 +118,7 @@
 <header>
   <h1>Panel de mercados</h1>
   <div class="meta" id="meta">Cargando datos…</div>
+  <div class="meta" id="reloj"></div>
 </header>
 
 <nav class="tabs" id="tabs">
@@ -409,9 +410,38 @@ fetch(DATA_URL)
       "restricciones del navegador). Verifica también que el workflow ya haya generado el archivo. ("+e.message+")");
   });
 
+function haceCuanto(antes, ahora){
+  let seg = Math.round((ahora - antes)/1000);
+  if(seg < 60) return "hace un momento";
+  let min = Math.round(seg/60);
+  if(min < 60) return "hace " + min + " min";
+  let h = Math.floor(min/60);
+  if(h < 24) return "hace " + h + (h===1?" hora":" horas");
+  let dias = Math.floor(h/24);
+  return "hace " + dias + (dias===1?" día":" días");
+}
+
 function render(d){
   DATA = d;
-  document.getElementById("meta").textContent = "Actualizado: " + d.generado + "  ·  Cambio vs. dato previo";
+  const gen = d.generado_iso ? new Date(d.generado_iso) : null;
+
+  function pintarMeta(){
+    const ahora = new Date();
+    let s;
+    if(gen && !isNaN(gen)){
+      const local = gen.toLocaleString("es-MX", {dateStyle:"medium", timeStyle:"short"});
+      s = "Actualizado: " + local + " (tu hora) · " + haceCuanto(gen, ahora);
+    } else {
+      s = "Actualizado: " + d.generado;   // respaldo si el JSON aún es viejo
+    }
+    s += "  ·  Cambio vs. dato previo";
+    document.getElementById("meta").textContent = s;
+    document.getElementById("reloj").textContent =
+      "Tu hora local: " + ahora.toLocaleString("es-MX", {dateStyle:"medium", timeStyle:"medium"});
+  }
+  pintarMeta();
+  setInterval(pintarMeta, 1000);
+
   document.getElementById("footer").innerHTML =
     "Fuentes — " + d.fuentes + ".<br>Generado automáticamente el " + d.generado +
     ". El % junto a cada cifra compara el último dato con el anterior disponible; "+
