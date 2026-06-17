@@ -212,6 +212,20 @@ function ultimosDos(arr){
   return r;
 }
 
+// promedio móvil sobre una ventana de posiciones (ignora huecos/nulos)
+function mediaMovil(arr, ventana){
+  const out = new Array(arr.length).fill(null);
+  for(let i=0;i<arr.length;i++){
+    let suma=0, cuenta=0;
+    for(let j=Math.max(0,i-ventana+1); j<=i; j++){
+      const v=arr[j];
+      if(v!==null && v!==undefined){ suma+=v; cuenta++; }
+    }
+    if(cuenta>=5) out[i]=suma/cuenta;
+  }
+  return out;
+}
+
 // cambio vs. dato previo disponible (solo para series de resumen: commodities + divisas)
 function cambio(serie){
   const arr = DATA.series[serie];
@@ -304,7 +318,13 @@ function graficarMacro(){
 function construirGraficas(tab){
   const f=DATA.fechas, s=DATA.series;
   if(tab==="commodities"){
-    if(s["Henry Hub ($/MMBtu)"]) lineChart("c-hh", f, [{data:s["Henry Hub ($/MMBtu)"], borderColor:"#FFC400"}]);
+    if(s["Henry Hub ($/MMBtu)"]){
+      const hh = s["Henry Hub ($/MMBtu)"];
+      lineChart("c-hh", f, [
+        {data:hh, borderColor:"#FFC400", label:"Precio"},
+        {data:mediaMovil(hh,30), borderColor:"#B8BCC0", borderDash:[5,4], label:"Promedio 30 días"}
+      ], {plugins:{legend:{display:true, labels:{boxWidth:12, font:{size:11}, color:"#cfcfcf"}}}});
+    }
     lineChart("c-oil", f, [
       {data:s["WTI ($/bbl)"],   borderColor:"#FF7A18", label:"WTI"},
       {data:s["Brent ($/bbl)"], borderColor:"#E62315", label:"Brent"}
