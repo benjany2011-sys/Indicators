@@ -307,12 +307,13 @@ def construir_diario():
 # ------------------------------------------------------------------
 # 2) Escritura del Excel con formato
 # ------------------------------------------------------------------
-# Paleta
-AZUL   = "1F3864"   # encabezados oscuros
-AZUL2  = "2E5496"   # títulos
-GRIS   = "F2F2F2"   # franjas alternas
+# Paleta (misma del panel web: carbón, naranja, rojo, dorado, franja cálida)
+AZUL   = "EA580C"   # fila de encabezados (naranja)
+AZUL2  = "26262B"   # barra de título (carbón)
+ORO    = "FFC400"   # texto de títulos / acentos (dorado)
+GRIS   = "FDF1E7"   # franjas alternas (cálido claro)
 BLANCO = "FFFFFF"
-borde_fino = Border(*(Side(style="thin", color="D9D9D9"),) * 4)
+borde_fino = Border(*(Side(style="thin", color="EADFD3"),) * 4)
 
 
 def _formatos_diario():
@@ -339,7 +340,7 @@ def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
     # ---- fila de título (fila 1) ----
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_col)
     c = ws.cell(row=1, column=1, value=titulo)
-    c.font = Font(name="Calibri", size=14, bold=True, color=BLANCO)
+    c.font = Font(name="Calibri", size=14, bold=True, color=ORO)
     c.fill = PatternFill("solid", fgColor=AZUL2)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 26
@@ -401,7 +402,7 @@ def _hoja_resumen(ws, diario, infl):
     ws.sheet_view.showGridLines = False
     ws.merge_cells("A1:C1")
     c = ws.cell(row=1, column=1, value="Resumen de mercados")
-    c.font = Font(name="Calibri", size=16, bold=True, color=BLANCO)
+    c.font = Font(name="Calibri", size=16, bold=True, color=ORO)
     c.fill = PatternFill("solid", fgColor=AZUL2)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 30
@@ -498,7 +499,7 @@ def _hoja_graficos_fx(wb, ws_diario, diario):
     ws.sheet_view.showGridLines = False
     ws.merge_cells("A1:R1")
     c = ws.cell(row=1, column=1, value="Tipos de cambio  ·  unidades por 1 USD")
-    c.font = Font(name="Calibri", size=14, bold=True, color=BLANCO)
+    c.font = Font(name="Calibri", size=14, bold=True, color=ORO)
     c.fill = PatternFill("solid", fgColor=AZUL2)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 26
