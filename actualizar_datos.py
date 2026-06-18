@@ -40,6 +40,7 @@ Llaves (EIA y FRED):
 import os
 import sys
 import json
+import time
 import datetime as dt
 from pathlib import Path
 
@@ -124,6 +125,34 @@ def sanear(df, col):
         log(f"  Saneando {col}: {n} valor(es) fuera de [{lo}, {hi}] -> vacío")
         df.loc[mask, col] = float("nan")
     return df
+
+
+# Acereras que cotizan en bolsa, vía Stooq (ticker -> nombre).
+# Se prefieren las listadas en NYSE para las internacionales (mejor cobertura).
+# Las marcadas como inciertas pueden no responder; el script las salta si fallan.
+ACERERAS_MUNDIAL = {
+    "MT.US":         "ArcelorMittal",
+    "5401.JP":       "Nippon Steel",
+    "PKX.US":        "POSCO",
+    "TX.US":         "Ternium",
+    "GGB.US":        "Gerdau",
+    "TKA.DE":        "thyssenkrupp",
+    "TATASTEEL.IN":  "Tata Steel",
+    "JSWSTEEL.IN":   "JSW Steel",
+    "SSAB-B.SE":     "SSAB",
+}
+ACERERAS_EEUU = {
+    "NUE.US":   "Nucor",
+    "STLD.US":  "Steel Dynamics",
+    "CLF.US":   "Cleveland-Cliffs",
+    "X.US":     "U.S. Steel",
+    "CMC.US":   "Commercial Metals",
+    "RS.US":    "Reliance",
+    "WOR.US":   "Worthington",
+    "ATI.US":   "ATI",
+    "CRS.US":   "Carpenter Technology",
+    "ZEUS.US":  "Olympic Steel",
+}
 
 # Para cada divisa se agrega además la columna inversa "USD por <ISO>"
 # (cuántos dólares vale 1 unidad de esa moneda = 1 / "X por USD").
@@ -278,6 +307,115 @@ def obtener_macro():
     macro = infl.merge(des, on="fecha", how="outer").merge(pib, on="fecha", how="outer")
     macro = macro[macro["fecha"] >= FECHA_INICIO].sort_values("fecha").reset_index(drop=True)
     return macro
+
+
+# ------------------------------------------------------------------
+# 1b) Acereras: precios de acciones (Stooq) -> índices y correlación
+# ------------------------------------------------------------------
+def obtener_stooq(ticker, reintentos=2):
+    """
+    Cierre diario de una acción desde Stooq (CSV, sin llave).
+    Devuelve una Serie indexada por fecha, o None si no hay datos.
+    """
+    from io import StringIO
+    url = f"https://stooq.com/q/d/l/?s={ticker}&i=d"
+    for intento in range(1, reintentos + 1):
+        try:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+            r.raise_for_status()
+            txt = r.text or ""
+            if txt.lstrip().startswith("<") or "no data" in txt.lower():
+                return None
+            df = pd.read_csv(StringIO(txt))
+            if "Date" not in df.columns or "Close" not in df.columns:
+                return None
+            s = pd.Series(pd.to_numeric(df["Close"], errors="coerce").values,
+                          index=pd.to_datetime(df["Date"], errors="coerce"))
+            s.index.name = "fecha"
+            s = s.dropna()
+            s = s[s.index >= FECHA_INICIO]
+            time.sleep(0.6)   # cortesía con el servidor / evita rate limit
+            return s if not s.empty else None
+        except Exception as e:
+            log(f"  Stooq {ticker} intento {intento}: {e}")
+    return None
+
+
+def _indice_grupo(precios):
+    """
+    Índice equal-weight (base 100) a partir de los rendimientos diarios promedio
+    de las acciones del grupo. Así entran/salen empresas sin saltos artificiales.
+    Recorta movimientos diarios a ±50% para evitar artefactos por splits.
+    """
+    rets = {}
+    for tk, s in precios.items():
+        s = s.dropna().sort_index()
+        if len(s) < 2:
+            continue
+        rets[tk] = s.pct_change().clip(-0.5, 0.5)
+    if not rets:
+        return None
+    R = pd.DataFrame(rets).sort_index()
+    prom = R.mean(axis=1, skipna=True).fillna(0.0)   # rendimiento equal-weight
+    return 100.0 * (1 + prom).cumprod()
+
+
+def construir_acereras():
+    """
+    Descarga las acereras de cada grupo, arma dos índices base 100 y calcula
+    su correlación (global y móvil a 90 días). Devuelve (df, info).
+    """
+    def jalar(dic, etiqueta):
+        precios, ok, fallaron = {}, [], []
+        for tk, nom in dic.items():
+            log(f"Descargando {nom} ({tk}) [{etiqueta}]...")
+            s = obtener_stooq(tk)
+            if s is None or s.empty:
+                fallaron.append(f"{nom} ({tk})")
+            else:
+                precios[tk] = s
+                ok.append(nom)
+        return precios, ok, fallaron
+
+    p_m, ok_m, fail_m = jalar(ACERERAS_MUNDIAL, "mundial")
+    p_u, ok_u, fail_u = jalar(ACERERAS_EEUU, "EE.UU.")
+
+    idx_m = _indice_grupo(p_m)
+    idx_u = _indice_grupo(p_u)
+    if idx_m is None or idx_u is None:
+        log("  Aviso: faltan datos de acereras en algún grupo; se omite la sección.")
+        return None, {"corr_global": None, "ok_mundial": ok_m, "ok_eeuu": ok_u,
+                      "fallaron": fail_m + fail_u}
+
+    df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u}, axis=1)
+    df = df.sort_index()
+    df = df[df.index >= FECHA_INICIO].dropna(how="all")
+    # rebasar ambos a 100 en su primera fecha común para comparar en la gráfica
+    df = df.dropna()
+    for c in df.columns:
+        df[c] = df[c] / df[c].iloc[0] * 100.0
+
+    # Correlación sobre rendimientos SEMANALES (cierre de viernes). La semana
+    # da tiempo a que todas las bolsas (Asia, Europa, EE. UU.) reflejen lo mismo,
+    # así que elimina el desfase de husos horarios que ensucia la versión diaria.
+    sem = df.resample("W-FRI").last()
+    rmw = sem["Índice mundial"].pct_change()
+    ruw = sem["Índice EE. UU."].pct_change()
+    corr_global = float(rmw.corr(ruw))
+    corr_movil = rmw.rolling(13).corr(ruw)            # ~1 trimestre (13 semanas)
+
+    corr_fecha = [d.strftime("%Y-%m-%d") for d in sem.index]
+    corr_series = [None if pd.isna(v) else round(float(v), 3) for v in corr_movil]
+
+    df = df.reset_index().rename(columns={"index": "fecha"})
+    if "fecha" not in df.columns:        # por si el índice no se llamaba 'fecha'
+        df = df.rename(columns={df.columns[0]: "fecha"})
+
+    info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
+            "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
+            "fallaron": fail_m + fail_u}
+    log(f"Correlación semanal acereras mundial vs. EE. UU. (desde {FECHA_INICIO}): {corr_global:.2f}")
+    return df, info
 
 
 def construir_diario():
@@ -531,7 +669,7 @@ def _hoja_graficos_fx(wb, ws_diario, diario):
         idx += 1
 
 
-def escribir_excel(diario, infl, ruta):
+def escribir_excel(diario, infl, ruta, acereras=None):
     wb = Workbook()
 
     # Hoja 1: Resumen
@@ -563,7 +701,14 @@ def escribir_excel(diario, infl, ruta):
                      "Desempleo": '0.0"%"', "PIB crec.": '0.0"%"'},
                     "Macro EE. UU.  ·  inflación, desempleo y PIB")
 
-    # Hoja 4: una gráfica por divisa
+    # Hoja 4: Acereras (índices; la correlación semanal va en el panel web)
+    if acereras is not None and not acereras.empty:
+        ws_ac = wb.create_sheet("Acereras")
+        _estilizar_hoja(ws_ac, acereras,
+                        {"Índice mundial": "#,##0.0", "Índice EE. UU.": "#,##0.0"},
+                        "Acereras  ·  índice mundial vs. EE. UU. (base 100 = 2021)")
+
+    # Hoja final: una gráfica por divisa
     _hoja_graficos_fx(wb, ws_dia, diario)
 
     wb.save(ruta)
@@ -646,7 +791,7 @@ def crear_graficos_fx(diario, ruta_png):
 # ------------------------------------------------------------------
 # 3b) Exportar datos a JSON (para el panel web / GitHub Pages)
 # ------------------------------------------------------------------
-def escribir_json(diario, macro, ruta):
+def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None):
     """Vuelca los datos en un JSON compacto que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -691,13 +836,29 @@ def escribir_json(diario, macro, ruta):
         "generado": ahora_utc.strftime("%Y-%m-%d %H:%M UTC"),
         "generado_iso": ahora_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB: "
-                   "FRED · Divisas: Frankfurter (BCE)",
+                   "FRED · Divisas: Frankfurter (BCE) · Acciones: Stooq",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
         "series": series,
         "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
         "macro": macro_out,
         "resumen": resumen,
     }
+
+    if acereras is not None and not acereras.empty:
+        ia = info_acereras or {}
+        cg = ia.get("corr_global")
+        obj["acereras"] = {
+            "fecha": acereras["fecha"].dt.strftime("%Y-%m-%d").tolist(),
+            "mundial": limpia(acereras["Índice mundial"], 2),
+            "eeuu": limpia(acereras["Índice EE. UU."], 2),
+            "corr_fecha": ia.get("corr_fecha", []),
+            "corr": ia.get("corr_series", []),
+            "corr_global": (None if cg is None else round(cg, 3)),
+            "ok_mundial": ia.get("ok_mundial", []),
+            "ok_eeuu": ia.get("ok_eeuu", []),
+            "fallaron": ia.get("fallaron", []),
+        }
+
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
 
@@ -716,6 +877,12 @@ def main():
         diario = construir_diario()
         log("Descargando indicadores macro (FRED)...")
         macro = obtener_macro()
+        log("Descargando acereras (Stooq)...")
+        try:
+            acereras, info_ac = construir_acereras()
+        except Exception as e:
+            log(f"  Aviso: la sección de acereras falló y se omite: {e}")
+            acereras, info_ac = None, None
 
         xlsx_fecha = CARPETA / f"mercados_{HOY}.xlsx"
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
@@ -724,15 +891,16 @@ def main():
         png_fx_fecha = CARPETA / f"graficos_divisas_{HOY}.png"
         png_fx_recie = CARPETA / "graficos_divisas_reciente.png"
 
-        escribir_excel(diario, macro, xlsx_fecha)
-        escribir_excel(diario, macro, xlsx_recie)
+        escribir_excel(diario, macro, xlsx_fecha, acereras=acereras)
+        escribir_excel(diario, macro, xlsx_recie, acereras=acereras)
         crear_graficos(diario, macro, png_fecha)
         crear_graficos(diario, macro, png_recie)
         crear_graficos_fx(diario, png_fx_fecha)
         crear_graficos_fx(diario, png_fx_recie)
 
         # datos para el panel web (GitHub Pages)
-        escribir_json(diario, macro, CARPETA / "datos.json")
+        escribir_json(diario, macro, CARPETA / "datos.json",
+                      acereras=acereras, info_acereras=info_ac)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
