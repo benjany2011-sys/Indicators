@@ -238,3 +238,96 @@
 2026-06-18 23:06:18  Inflación YoY más reciente: 4.2% (2026-05-01)
 2026-06-18 23:06:18  Excel guardado en: /home/runner/work/Indicators/Indicators/resultados/mercados_reciente.xlsx
 2026-06-18 23:06:18  ===== Fin OK =====
+2026-06-19 13:40:36  ===== Inicio =====
+2026-06-19 13:40:36  Descargando Henry Hub (EIA)...
+2026-06-19 13:40:37  Descargando S&P 500 (FRED:SP500)...
+2026-06-19 13:40:37  Descargando WTI ($/bbl) (FRED:DCOILWTICO)...
+2026-06-19 13:40:37  Descargando Brent ($/bbl) (FRED:DCOILBRENTEU)...
+2026-06-19 13:40:37  Descargando divisas (Frankfurter/BCE)...
+2026-06-19 13:41:08    Saneando Henry Hub ($/MMBtu): 2 valor(es) fuera de [0.5, 25.0] -> vacío
+2026-06-19 13:41:08  Descargando indicadores macro (FRED)...
+2026-06-19 13:41:09  Descargando desempleo (FRED:UNRATE)...
+2026-06-19 13:41:09  Descargando PIB (FRED:A191RL1Q225SBEA)...
+2026-06-19 13:41:09  Descargando acereras (Stooq)...
+2026-06-19 13:41:09  Descargando ArcelorMittal (MT.US) [mundial]...
+2026-06-19 13:41:10    Stooq MT.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:12    Stooq MT.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:15    Stooq MT.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:20  Descargando Nippon Steel (5401.JP) [mundial]...
+2026-06-19 13:41:20    Stooq 5401.JP: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:22    Stooq 5401.JP: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:25    Stooq 5401.JP: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:30  Descargando POSCO (PKX.US) [mundial]...
+2026-06-19 13:41:31    Stooq PKX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:32    Stooq PKX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:36    Stooq PKX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:40  Descargando Ternium (TX.US) [mundial]...
+2026-06-19 13:41:41    Stooq TX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:43    Stooq TX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:46    Stooq TX.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:51  Descargando Gerdau (GGB.US) [mundial]...
+2026-06-19 13:41:51    Stooq GGB.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:53    Stooq GGB.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:41:57    Stooq GGB.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:01  Descargando thyssenkrupp (TKA.DE) [mundial]...
+2026-06-19 13:42:02    Stooq TKA.DE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:03    Stooq TKA.DE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:07    Stooq TKA.DE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:11  Descargando Tata Steel (TATASTEEL.IN) [mundial]...
+2026-06-19 13:42:12    Stooq TATASTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:14    Stooq TATASTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:17    Stooq TATASTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:21  Descargando JSW Steel (JSWSTEEL.IN) [mundial]...
+2026-06-19 13:42:22    Stooq JSWSTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:24    Stooq JSWSTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:27    Stooq JSWSTEEL.IN: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:32  Descargando SSAB (SSAB-B.SE) [mundial]...
+2026-06-19 13:42:32    Stooq SSAB-B.SE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:34    Stooq SSAB-B.SE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:37    Stooq SSAB-B.SE: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:42  Descargando Nucor (NUE.US) [EE.UU.]...
+2026-06-19 13:42:42    Stooq NUE.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:44    Stooq NUE.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:48    Stooq NUE.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:52  Descargando Steel Dynamics (STLD.US) [EE.UU.]...
+2026-06-19 13:42:53    Stooq STLD.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:55    Stooq STLD.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:42:58    Stooq STLD.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:03  Descargando Cleveland-Cliffs (CLF.US) [EE.UU.]...
+2026-06-19 13:43:03    Stooq CLF.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:05    Stooq CLF.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:08    Stooq CLF.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:13  Descargando U.S. Steel (X.US) [EE.UU.]...
+2026-06-19 13:43:13    Stooq X.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:15    Stooq X.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:18    Stooq X.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:23  Descargando Commercial Metals (CMC.US) [EE.UU.]...
+2026-06-19 13:43:23    Stooq CMC.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:25    Stooq CMC.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:28    Stooq CMC.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:33  Descargando Reliance (RS.US) [EE.UU.]...
+2026-06-19 13:43:33    Stooq RS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:35    Stooq RS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:38    Stooq RS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:43  Descargando Worthington (WOR.US) [EE.UU.]...
+2026-06-19 13:43:43    Stooq WOR.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:45    Stooq WOR.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:49    Stooq WOR.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:53  Descargando ATI (ATI.US) [EE.UU.]...
+2026-06-19 13:43:54    Stooq ATI.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:55    Stooq ATI.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:43:59    Stooq ATI.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:03  Descargando Carpenter Technology (CRS.US) [EE.UU.]...
+2026-06-19 13:44:04    Stooq CRS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:05    Stooq CRS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:09    Stooq CRS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:13  Descargando Olympic Steel (ZEUS.US) [EE.UU.]...
+2026-06-19 13:44:14    Stooq ZEUS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:16    Stooq ZEUS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:19    Stooq ZEUS.US: BLOQUEO/HTML (status 200) -> '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name='
+2026-06-19 13:44:23    Aviso: faltan datos de acereras en algún grupo; se omite la sección.
+2026-06-19 13:44:35  Henry Hub más reciente: $3.06/MMBtu (2026-06-15)
+2026-06-19 13:44:35  Peso más reciente: 17.3700 MXN/USD (2026-06-19)
+2026-06-19 13:44:35  Inflación YoY más reciente: 4.2% (2026-05-01)
+2026-06-19 13:44:35  Excel guardado en: /home/runner/work/Indicators/Indicators/resultados/mercados_reciente.xlsx
+2026-06-19 13:44:35  ===== Fin OK =====
