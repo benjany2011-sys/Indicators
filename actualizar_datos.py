@@ -312,32 +312,50 @@ def obtener_macro():
 # ------------------------------------------------------------------
 # 1b) Acereras: precios de acciones (Stooq) -> índices y correlación
 # ------------------------------------------------------------------
-def obtener_stooq(ticker, reintentos=2):
+def obtener_stooq(ticker, reintentos=3):
     """
     Cierre diario de una acción desde Stooq (CSV, sin llave).
-    Devuelve una Serie indexada por fecha, o None si no hay datos.
+    Devuelve una Serie indexada por fecha, o None. Ahora registra POR QUÉ
+    falla y reintenta con espera creciente ante bloqueos.
     """
     from io import StringIO
     url = f"https://stooq.com/q/d/l/?s={ticker}&i=d"
+    headers = {
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                       "Chrome/124.0 Safari/537.36"),
+        "Accept": "text/csv,text/plain,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://stooq.com/",
+    }
     for intento in range(1, reintentos + 1):
         try:
-            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+            r = requests.get(url, headers=headers, timeout=60)
             r.raise_for_status()
-            txt = r.text or ""
-            if txt.lstrip().startswith("<") or "no data" in txt.lower():
-                return None
-            df = pd.read_csv(StringIO(txt))
-            if "Date" not in df.columns or "Close" not in df.columns:
-                return None
-            s = pd.Series(pd.to_numeric(df["Close"], errors="coerce").values,
-                          index=pd.to_datetime(df["Date"], errors="coerce"))
-            s.index.name = "fecha"
-            s = s.dropna()
-            s = s[s.index >= FECHA_INICIO]
-            time.sleep(0.6)   # cortesía con el servidor / evita rate limit
-            return s if not s.empty else None
+            txt = (r.text or "").strip()
+            if not txt:
+                log(f"  Stooq {ticker}: respuesta VACÍA (status {r.status_code})")
+            elif txt.startswith("<"):
+                log(f"  Stooq {ticker}: BLOQUEO/HTML (status {r.status_code}) -> '{txt[:60]}'")
+            elif "no data" in txt.lower() or txt.lower().startswith("exceeded"):
+                log(f"  Stooq {ticker}: SIN DATOS/LÍMITE -> '{txt[:60]}'")
+            else:
+                df = pd.read_csv(StringIO(txt))
+                if "Date" not in df.columns or "Close" not in df.columns:
+                    log(f"  Stooq {ticker}: columnas raras {list(df.columns)[:5]}")
+                else:
+                    s = pd.Series(pd.to_numeric(df["Close"], errors="coerce").values,
+                                  index=pd.to_datetime(df["Date"], errors="coerce"))
+                    s.index.name = "fecha"
+                    s = s.dropna()
+                    s = s[s.index >= FECHA_INICIO]
+                    if not s.empty:
+                        time.sleep(0.8)
+                        return s
+                    log(f"  Stooq {ticker}: 0 filas tras filtrar desde {FECHA_INICIO}")
         except Exception as e:
             log(f"  Stooq {ticker} intento {intento}: {e}")
+        time.sleep(1.5 * intento)   # espera creciente entre reintentos
     return None
 
 
