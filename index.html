@@ -445,12 +445,12 @@ function construirAcereras(){
 function tarjetaPrecio(p){
   const c = (p.cambio===null || p.cambio===undefined) ? null : {pp:false, val:p.cambio};
   const el=document.createElement("div"); el.className="card";
-  const grupo = p.grupo ? "<div class='interp'>"+p.grupo+"</div>" : "";
+  const etiq = (p.pais || p.grupo) ? "<div class='interp'>"+(p.pais || p.grupo)+"</div>" : "";
   el.innerHTML =
     "<div class='nombre'>"+p.nombre+"</div>"+
     "<div class='valor'>$"+(p.valor!=null? p.valor.toLocaleString("es-MX",{minimumFractionDigits:2, maximumFractionDigits:2}) : "—")+"</div>"+
     "<div class='delta-linea'>"+htmlDelta(c)+"</div>"+
-    grupo+
+    etiq+
     "<div class='fecha'>"+p.fecha+"</div>";
   return el;
 }
@@ -475,7 +475,7 @@ function graficarAcereras(){
     sel.innerHTML = "";
     pr.resumen.forEach(p=>{
       const o=document.createElement("option");
-      o.value=p.nombre; o.textContent=p.nombre + (p.grupo? "  ·  "+p.grupo : "");
+      o.value=p.nombre; o.textContent=p.nombre + ((p.pais||p.grupo)? "  ·  "+(p.pais||p.grupo) : "");
       sel.appendChild(o);
     });
     const inicial = pr.resumen[0].nombre;
