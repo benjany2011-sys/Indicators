@@ -164,6 +164,33 @@ ACERERAS_EEUU = {
     # "X":   "U.S. Steel",  # deslistada el 18-jun-2025 (compra de Nippon); ya no cotiza
 }
 
+# País de cada acerera, para etiquetar las tarjetas y el selector del panel web
+# (sustituye al genérico "Mundial"). Si una empresa no aparece aquí, se usa su
+# grupo como respaldo. Edita libremente: Ternium, por ejemplo, está domiciliada
+# en Luxemburgo pero opera sobre todo en México/Argentina (grupo Techint), así
+# que puedes cambiarla a "México" si lo prefieres.
+PAIS_ACERERA = {
+    "ArcelorMittal":        "Luxemburgo",
+    "Gerdau":               "Brasil",
+    "Nippon Steel":         "Japón",
+    "POSCO":                "Corea del Sur",
+    "SSAB":                 "Suecia",
+    "Ternium":              "Argentina",
+    "thyssenkrupp":         "Alemania",
+    "Tata Steel":           "India",
+    "JSW Steel":            "India",
+    "Nucor":                "EE. UU.",
+    "Steel Dynamics":       "EE. UU.",
+    "Cleveland-Cliffs":     "EE. UU.",
+    "U.S. Steel":           "EE. UU.",
+    "Commercial Metals":    "EE. UU.",
+    "Reliance":             "EE. UU.",
+    "Worthington":          "EE. UU.",
+    "ATI":                  "EE. UU.",
+    "Carpenter Technology": "EE. UU.",
+    "Olympic Steel":        "EE. UU.",
+}
+
 # Para cada divisa se agrega además la columna inversa "USD por <ISO>"
 # (cuántos dólares vale 1 unidad de esa moneda = 1 / "X por USD").
 # Se usan 6 decimales porque las inversas van de ~1.16 (EUR) a ~0.0008 (KRW).
@@ -459,6 +486,7 @@ def _exportar_precios_acereras(grupos):
             if prev != 0:
                 cambio = round((ult - prev) / prev * 100.0, 2)
         resumen.append({"nombre": nombre, "grupo": grupo_de.get(nombre, ""),
+                        "pais": PAIS_ACERERA.get(nombre, grupo_de.get(nombre, "")),
                         "valor": round(ult, 2), "cambio": cambio,
                         "fecha": fecha_ult})
 
