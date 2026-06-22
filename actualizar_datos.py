@@ -9,6 +9,7 @@ Descarga y consolida en un solo Excel (bien formateado) las series:
   - WTI (petróleo, spot diario)                 -> FRED
   - Brent (petróleo, spot diario)               -> FRED
   - Tipo de cambio de 10 divisas vs. USD        -> Frankfurter (BCE)
+  - Acereras (acciones, índices base 100)        -> Twelve Data
 
 Todas las series diarias arrancan en 2021-01-01.
 
@@ -26,14 +27,16 @@ Cada vez que corre crea (junto al script) una carpeta `resultados` con:
 Requisitos (una sola vez):
     pip install requests pandas matplotlib openpyxl
 
-Llaves (EIA y FRED):
+Llaves (EIA, FRED y Twelve Data):
   - En tu PC: archivo `.env` en la misma carpeta, con
         EIA_API_KEY=tu_llave_de_eia
         FRED_API_KEY=tu_llave_de_fred
+        TWELVEDATA_API_KEY=tu_llave_de_twelvedata
     (necesita además `pip install python-dotenv`)
   - En GitHub Actions: como Secrets del repo; el workflow las pasa
     como variables de entorno. No hace falta .env ni python-dotenv.
-  Frankfurter no necesita llave.
+  Frankfurter no necesita llave. Si falta TWELVEDATA_API_KEY, el panel
+  corre igual pero la sección de acereras se omite.
 ===================================================================
 """
 
@@ -68,6 +71,9 @@ from openpyxl.chart import LineChart, Reference
 # ------------------------------------------------------------------
 EIA_API_KEY = os.getenv("EIA_API_KEY")
 FRED_API_KEY = os.getenv("FRED_API_KEY")
+# Acereras (acciones) vienen ahora de Twelve Data. El workflow ya inyecta este
+# Secret como variable de entorno; en tu PC va en el .env como las otras.
+TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 
 FECHA_INICIO = "2021-01-01"           # arranque común de todas las series
 
@@ -127,31 +133,35 @@ def sanear(df, col):
     return df
 
 
-# Acereras que cotizan en bolsa, vía Stooq (ticker -> nombre).
-# Se prefieren las listadas en NYSE para las internacionales (mejor cobertura).
-# Las marcadas como inciertas pueden no responder; el script las salta si fallan.
+# Acereras que cotizan en bolsa, vía Twelve Data (símbolo -> nombre).
+# En el plan GRATIS de Twelve Data solo entran de forma fiable las acciones
+# listadas en EE. UU. (NYSE/Nasdaq). Por eso para las internacionales se usa su
+# ADR/listado en EE. UU. Las que solo cotizan fuera (Tata y JSW en India) y las
+# OTC inciertas se dejan abajo comentadas: si subes a un plan de pago, las
+# descomentas y listo. Si un símbolo no responde, el script lo salta y lo
+# reporta en "fallaron" (el índice equal-weight tolera entradas/salidas).
 ACERERAS_MUNDIAL = {
-    "MT.US":         "ArcelorMittal",
-    "5401.JP":       "Nippon Steel",
-    "PKX.US":        "POSCO",
-    "TX.US":         "Ternium",
-    "GGB.US":        "Gerdau",
-    "TKA.DE":        "thyssenkrupp",
-    "TATASTEEL.IN":  "Tata Steel",
-    "JSWSTEEL.IN":   "JSW Steel",
-    "SSAB-B.SE":     "SSAB",
+    "MT":     "ArcelorMittal",     # NYSE
+    "PKX":    "POSCO",             # NYSE (ADR)
+    "TX":     "Ternium",           # NYSE
+    "GGB":    "Gerdau",            # NYSE
+    "NPSCY":  "Nippon Steel",      # OTC (ADR) — puede requerir plan de pago
+    "TKAMY":  "thyssenkrupp",      # OTC (ADR) — puede requerir plan de pago
+    "SSAAY":  "SSAB",              # OTC (ADR) — puede requerir plan de pago
+    # "TATASTEEL:NSE": "Tata Steel",  # India: requiere plan de pago en Twelve Data
+    # "JSWSTEEL:NSE":  "JSW Steel",   # India: requiere plan de pago en Twelve Data
 }
 ACERERAS_EEUU = {
-    "NUE.US":   "Nucor",
-    "STLD.US":  "Steel Dynamics",
-    "CLF.US":   "Cleveland-Cliffs",
-    "X.US":     "U.S. Steel",
-    "CMC.US":   "Commercial Metals",
-    "RS.US":    "Reliance",
-    "WOR.US":   "Worthington",
-    "ATI.US":   "ATI",
-    "CRS.US":   "Carpenter Technology",
-    "ZEUS.US":  "Olympic Steel",
+    "NUE":   "Nucor",
+    "STLD":  "Steel Dynamics",
+    "CLF":   "Cleveland-Cliffs",
+    "CMC":   "Commercial Metals",
+    "RS":    "Reliance",
+    "WOR":   "Worthington",
+    "ATI":   "ATI",
+    "CRS":   "Carpenter Technology",
+    "ZEUS":  "Olympic Steel",
+    # "X":   "U.S. Steel",  # deslistada el 18-jun-2025 (compra de Nippon); ya no cotiza
 }
 
 # Para cada divisa se agrega además la columna inversa "USD por <ISO>"
@@ -310,52 +320,82 @@ def obtener_macro():
 
 
 # ------------------------------------------------------------------
-# 1b) Acereras: precios de acciones (Stooq) -> índices y correlación
+# 1b) Acereras: precios de acciones (Twelve Data) -> índices y correlación
 # ------------------------------------------------------------------
-def obtener_stooq(ticker, reintentos=3):
+def obtener_twelvedata(symbol, reintentos=4):
     """
-    Cierre diario de una acción desde Stooq (CSV, sin llave).
-    Devuelve una Serie indexada por fecha, o None. Ahora registra POR QUÉ
-    falla y reintenta con espera creciente ante bloqueos.
+    Cierre diario de una acción desde Twelve Data (JSON, con llave).
+    Devuelve una Serie indexada por fecha, o None. Registra POR QUÉ falla.
+
+    Notas sobre el plan GRATIS de Twelve Data:
+      - Límite de frecuencia: 8 peticiones por minuto (el throttle real va en
+        'jalar', que espera entre símbolo y símbolo).
+      - Límite diario: 800 créditos; cada llamada aquí cuesta 1 crédito.
+      - Si se topa con el límite (code 429 / "credits"), espera ~65 s y reintenta.
+      - Si el símbolo no existe o el plan no lo cubre, no insiste: lo salta.
+    Twelve Data devuelve HTTP 200 incluso en errores lógicos; el detalle viene
+    en el campo 'status'/'code' del JSON, así que eso es lo que revisamos.
     """
-    from io import StringIO
-    url = f"https://stooq.com/q/d/l/?s={ticker}&i=d"
-    headers = {
-        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                       "AppleWebKit/537.36 (KHTML, like Gecko) "
-                       "Chrome/124.0 Safari/537.36"),
-        "Accept": "text/csv,text/plain,*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://stooq.com/",
+    if not TWELVEDATA_API_KEY:
+        log(f"  TwelveData {symbol}: falta TWELVEDATA_API_KEY (Secret del repo / .env)")
+        return None
+
+    url = "https://api.twelvedata.com/time_series"
+    params = {
+        "symbol":     symbol,
+        "interval":   "1day",
+        "start_date": FECHA_INICIO,
+        "outputsize": 5000,          # cubre de 2021 a hoy con margen de sobra
+        "order":      "ASC",
+        "apikey":     TWELVEDATA_API_KEY,
+        "format":     "JSON",
     }
     for intento in range(1, reintentos + 1):
         try:
-            r = requests.get(url, headers=headers, timeout=60)
-            r.raise_for_status()
-            txt = (r.text or "").strip()
-            if not txt:
-                log(f"  Stooq {ticker}: respuesta VACÍA (status {r.status_code})")
-            elif txt.startswith("<"):
-                log(f"  Stooq {ticker}: BLOQUEO/HTML (status {r.status_code}) -> '{txt[:60]}'")
-            elif "no data" in txt.lower() or txt.lower().startswith("exceeded"):
-                log(f"  Stooq {ticker}: SIN DATOS/LÍMITE -> '{txt[:60]}'")
-            else:
-                df = pd.read_csv(StringIO(txt))
-                if "Date" not in df.columns or "Close" not in df.columns:
-                    log(f"  Stooq {ticker}: columnas raras {list(df.columns)[:5]}")
-                else:
-                    s = pd.Series(pd.to_numeric(df["Close"], errors="coerce").values,
-                                  index=pd.to_datetime(df["Date"], errors="coerce"))
-                    s.index.name = "fecha"
-                    s = s.dropna()
-                    s = s[s.index >= FECHA_INICIO]
-                    if not s.empty:
-                        time.sleep(0.8)
-                        return s
-                    log(f"  Stooq {ticker}: 0 filas tras filtrar desde {FECHA_INICIO}")
+            r = requests.get(url, params=params, timeout=60)
+            try:
+                data = r.json()
+            except ValueError:
+                log(f"  TwelveData {symbol}: respuesta no-JSON (status {r.status_code}) "
+                    f"-> '{(r.text or '')[:60]}'")
+                time.sleep(3.0 * intento)
+                continue
+
+            # Error lógico: {"status":"error","code":...,"message":...}
+            if isinstance(data, dict) and data.get("status") == "error":
+                code = data.get("code")
+                msg = (data.get("message") or "")[:90]
+                if code == 429 or "credit" in msg.lower() or "limit" in msg.lower():
+                    espera = 65
+                    log(f"  TwelveData {symbol}: LÍMITE (code {code}) -> espero {espera}s -> '{msg}'")
+                    time.sleep(espera)
+                    continue
+                # Símbolo inexistente o no cubierto por el plan: no insistir.
+                log(f"  TwelveData {symbol}: ERROR (code {code}) -> '{msg}'")
+                return None
+
+            valores = data.get("values") if isinstance(data, dict) else None
+            if not valores:
+                log(f"  TwelveData {symbol}: sin 'values' -> '{str(data)[:90]}'")
+                return None
+
+            df = pd.DataFrame(valores)
+            if "datetime" not in df.columns or "close" not in df.columns:
+                log(f"  TwelveData {symbol}: columnas raras {list(df.columns)[:5]}")
+                return None
+
+            s = pd.Series(pd.to_numeric(df["close"], errors="coerce").values,
+                          index=pd.to_datetime(df["datetime"], errors="coerce"))
+            s.index.name = "fecha"
+            s = s.dropna().sort_index()
+            s = s[s.index >= FECHA_INICIO]
+            if not s.empty:
+                return s
+            log(f"  TwelveData {symbol}: 0 filas tras filtrar desde {FECHA_INICIO}")
+            return None
         except Exception as e:
-            log(f"  Stooq {ticker} intento {intento}: {e}")
-        time.sleep(1.5 * intento)   # espera creciente entre reintentos
+            log(f"  TwelveData {symbol} intento {intento}: {e}")
+            time.sleep(3.0 * intento)
     return None
 
 
@@ -383,16 +423,22 @@ def construir_acereras():
     Descarga las acereras de cada grupo, arma dos índices base 100 y calcula
     su correlación (global y móvil a 90 días). Devuelve (df, info).
     """
+    if not TWELVEDATA_API_KEY:
+        log("  Aviso: falta TWELVEDATA_API_KEY; se omite la sección de acereras.")
+        return None, {"corr_global": None, "ok_mundial": [], "ok_eeuu": [],
+                      "fallaron": ["(sin TWELVEDATA_API_KEY)"]}
+
     def jalar(dic, etiqueta):
         precios, ok, fallaron = {}, [], []
         for tk, nom in dic.items():
             log(f"Descargando {nom} ({tk}) [{etiqueta}]...")
-            s = obtener_stooq(tk)
+            s = obtener_twelvedata(tk)
             if s is None or s.empty:
                 fallaron.append(f"{nom} ({tk})")
             else:
                 precios[tk] = s
                 ok.append(nom)
+            time.sleep(8.0)   # plan gratis: máx. 8 peticiones/min -> 1 cada 8 s
         return precios, ok, fallaron
 
     p_m, ok_m, fail_m = jalar(ACERERAS_MUNDIAL, "mundial")
@@ -854,7 +900,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None):
         "generado": ahora_utc.strftime("%Y-%m-%d %H:%M UTC"),
         "generado_iso": ahora_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB: "
-                   "FRED · Divisas: Frankfurter (BCE) · Acciones: Stooq",
+                   "FRED · Divisas: Frankfurter (BCE) · Acciones: Twelve Data",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
         "series": series,
         "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
@@ -895,7 +941,7 @@ def main():
         diario = construir_diario()
         log("Descargando indicadores macro (FRED)...")
         macro = obtener_macro()
-        log("Descargando acereras (Stooq)...")
+        log("Descargando acereras (Twelve Data)...")
         try:
             acereras, info_ac = construir_acereras()
         except Exception as e:
