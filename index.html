@@ -128,6 +128,7 @@
   <button class="tab" data-tab="commodities">Commodities</button>
   <button class="tab" data-tab="acereras">Acereras</button>
   <button class="tab" data-tab="macro">Macro EE. UU.</button>
+  <button class="tab" data-tab="construccion">Construcción</button>
   <button class="tab" data-tab="archivos">Archivos</button>
 </nav>
 
@@ -196,6 +197,15 @@
     <div class="cards" id="cards-macro"></div>
     <div class="seccion-titulo">Evolución</div>
     <div class="grid-graf" id="graf-macro"></div>
+  </section>
+
+  <!-- CONSTRUCCIÓN -->
+  <section id="sec-construccion">
+    <div class="seccion-titulo">Construcción EE. UU. — últimos valores</div>
+    <div class="cards" id="cards-construccion"></div>
+    <div class="seccion-titulo">Evolución</div>
+    <div class="grid-graf" id="graf-construccion"></div>
+    <div class="cobertura">Indicadores líderes de demanda de acero, vía FRED (datos del U.S. Census Bureau). Housing Starts: viviendas iniciadas, miles de unidades anualizadas (SAAR). Construction Spending: gasto total en construcción, anualizado (SAAR).</div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -398,6 +408,53 @@ function graficarMacro(){
   });
 }
 
+// formatea un valor de construcción según su unidad (prefijo, decimales, sufijo)
+function fmtConstr(v, ind){
+  if(v===null || v===undefined) return "—";
+  const n = v.toLocaleString("es-MX",{minimumFractionDigits:ind.dec, maximumFractionDigits:ind.dec});
+  return (ind.prefijo||"")+n+(ind.sufijo||"");
+}
+
+function construirConstruccion(){
+  const cont=document.getElementById("cards-construccion");
+  const graf=document.getElementById("graf-construccion");
+  const lista = DATA.construccion||[];
+  if(!lista.length){
+    if(cont) cont.innerHTML="<div class='card'><div class='nombre'>Construcción</div>"+
+      "<div class='interp'>Sin datos en esta corrida.</div></div>";
+    return;
+  }
+  lista.forEach((ind, k)=>{
+    const v = ultimosDosMacro(ind.valores);   // [último, previo] no nulos
+    const ultVal = v.length ? v[0] : null;
+    // estos son niveles, así que el cambio se muestra en % mensual
+    let delta=null;
+    if(v.length>=2 && v[1]!==0) delta={pp:false, val:(v[0]-v[1])/v[1]*100};
+    const ultFecha = ind.fecha.length ? ind.fecha[ind.fecha.length-1] : "";
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML =
+      "<div class='nombre'>"+ind.nombre+"</div>"+
+      "<div class='valor'>"+fmtConstr(ultVal, ind)+"</div>"+
+      "<div class='delta-linea'>"+htmlDelta(delta)+"</div>"+
+      "<div class='interp'>"+(ind.unidad||"")+"</div>"+
+      "<div class='fecha'>"+ultFecha+"</div>";
+    cont.appendChild(card);
+    const panel=document.createElement("div"); panel.className="panel ancho";
+    panel.innerHTML="<h3>"+ind.nombre+"  ·  "+(ind.unidad||"")+"</h3>"+
+      "<div class='lienzo'><canvas id='c-constr-"+k+"'></canvas></div>";
+    graf.appendChild(panel);
+  });
+}
+
+function graficarConstruccion(){
+  (DATA.construccion||[]).forEach((ind, k)=>{
+    lineChart("c-constr-"+k, ind.fecha, [{data:ind.valores, borderColor:"#FF9D2E"}], {
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=> fmtConstr(c.parsed.y, ind) } } }
+    });
+  });
+}
+
 function etiquetaCorr(r){
   if(r===null || r===undefined) return "Sin dato suficiente";
   const ar=Math.abs(r);
@@ -510,6 +567,9 @@ function construirGraficas(tab){
   if(tab==="macro"){
     graficarMacro();
   }
+  if(tab==="construccion"){
+    graficarConstruccion();
+  }
   if(tab==="acereras"){
     graficarAcereras();
   }
@@ -587,6 +647,7 @@ function render(d){
     else cCom.appendChild(tarjeta(r));
   });
   construirMacro();   // tarjetas + paneles de Macro EE. UU.
+  construirConstruccion(); // tarjetas + paneles de Construcción
   construirAcereras();// tarjeta de correlación + cobertura
 
   // pestañas
