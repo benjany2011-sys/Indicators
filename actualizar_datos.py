@@ -346,6 +346,28 @@ def obtener_macro():
     return macro
 
 
+def obtener_construccion():
+    """
+    Indicadores de construcción de EE. UU. (FRED, datos del Census), mensuales.
+    Son indicadores líderes de demanda de acero:
+      - Housing Starts        viviendas iniciadas, miles de unidades, SAAR (HOUST)
+      - Construction Spending gasto total en construcción, SAAR (TTLCONS).
+                              FRED lo entrega en MILLONES de USD; aquí se pasa a
+                              MILES DE MILLONES para que la cifra sea legible.
+    Devuelve un DataFrame [fecha, Housing Starts, Construction Spending] o None.
+    """
+    log("Descargando Housing Starts (FRED:HOUST)...")
+    hs = obtener_fred("HOUST").rename(columns={"valor": "Housing Starts"})
+
+    log("Descargando Construction Spending (FRED:TTLCONS)...")
+    cs = obtener_fred("TTLCONS").rename(columns={"valor": "Construction Spending"})
+    cs["Construction Spending"] = cs["Construction Spending"] / 1000.0  # millones -> miles de millones
+
+    con = hs.merge(cs, on="fecha", how="outer")
+    con = con[con["fecha"] >= FECHA_INICIO].sort_values("fecha").reset_index(drop=True)
+    return con
+
+
 # ------------------------------------------------------------------
 # 1b) Acereras: precios de acciones (Twelve Data) -> índices y correlación
 # ------------------------------------------------------------------
@@ -936,7 +958,8 @@ def crear_graficos_fx(diario, ruta_png):
 # ------------------------------------------------------------------
 # 3b) Exportar datos a JSON (para el panel web / GitHub Pages)
 # ------------------------------------------------------------------
-def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None):
+def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
+                  construccion=None):
     """Vuelca los datos en un JSON compacto que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -976,16 +999,42 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None):
             "valores": limpia(sub[col], 5),
         })
 
+    # indicadores de construcción (niveles mensuales). Cada uno trae su unidad y
+    # formato para que el panel lo muestre tal cual (no son porcentajes).
+    construccion_def = [
+        # (nombre, columna, unidad, decimales, prefijo, sufijo)
+        ("Housing Starts",        "Housing Starts",
+         "miles de unidades · SAAR", 0, "",  ""),
+        ("Construction Spending", "Construction Spending",
+         "mil millones USD · SAAR",  0, "$", ""),
+    ]
+    construccion_out = []
+    if construccion is not None and not construccion.empty:
+        for nombre, col, unidad, dec, prefijo, sufijo in construccion_def:
+            if col not in construccion.columns:
+                continue
+            sub = construccion[["fecha", col]].dropna()
+            if sub.empty:
+                continue
+            construccion_out.append({
+                "nombre": nombre, "unidad": unidad, "dec": dec,
+                "prefijo": prefijo, "sufijo": sufijo,
+                "fecha": sub["fecha"].dt.strftime("%Y-%m-%d").tolist(),
+                "valores": limpia(sub[col], 1),
+            })
+
     ahora_utc = dt.datetime.now(dt.timezone.utc)
     obj = {
         "generado": ahora_utc.strftime("%Y-%m-%d %H:%M UTC"),
         "generado_iso": ahora_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB: "
-                   "FRED · Divisas: Frankfurter (BCE) · Acciones: Twelve Data",
+        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB, "
+                   "Housing Starts, Construction Spending: FRED · "
+                   "Divisas: Frankfurter (BCE) · Acciones: Twelve Data",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
         "series": series,
         "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
         "macro": macro_out,
+        "construccion": construccion_out,
         "resumen": resumen,
     }
 
@@ -1023,6 +1072,14 @@ def main():
         diario = construir_diario()
         log("Descargando indicadores macro (FRED)...")
         macro = obtener_macro()
+
+        log("Descargando indicadores de construcción (FRED)...")
+        try:
+            construccion = obtener_construccion()
+        except Exception as e:
+            log(f"  Aviso: la sección de construcción falló y se omite: {e}")
+            construccion = None
+
         log("Descargando acereras (Twelve Data)...")
         try:
             acereras, info_ac = construir_acereras()
@@ -1046,7 +1103,8 @@ def main():
 
         # datos para el panel web (GitHub Pages)
         escribir_json(diario, macro, CARPETA / "datos.json",
-                      acereras=acereras, info_acereras=info_ac)
+                      acereras=acereras, info_acereras=info_ac,
+                      construccion=construccion)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
