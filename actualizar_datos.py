@@ -418,6 +418,55 @@ def _indice_grupo(precios):
     return 100.0 * (1 + prom).cumprod()
 
 
+def _exportar_precios_acereras(grupos):
+    """
+    Arma la estructura de PRECIOS por acción para el panel web, al estilo de las
+    divisas: una tarjeta por empresa (último precio + % de cambio + fecha) y una
+    serie completa por empresa para la gráfica con selector.
+
+    'grupos' es una lista de (dic_ticker_a_nombre, precios_ticker_a_serie).
+    Devuelve {"fecha": [...], "series": {nombre: [...]}, "resumen": [...]} o None.
+    Los precios son el cierre tal cual lo entrega Twelve Data (USD para las que
+    cotizan en EE. UU.). Se redondean a 2 decimales.
+    """
+    cols = {}
+    grupo_de = {}
+    for dic, precios in grupos:
+        etiqueta = "Mundial" if dic is grupos[0][0] else "EE. UU."
+        for tk, s in precios.items():
+            nombre = dic.get(tk, tk)
+            cols[nombre] = s
+            grupo_de[nombre] = etiqueta
+    if not cols:
+        return None
+
+    P = pd.DataFrame(cols).sort_index()
+    P = P[P.index >= FECHA_INICIO]
+    fechas = [d.strftime("%Y-%m-%d") for d in P.index]
+
+    series, resumen = {}, []
+    for nombre in P.columns:
+        col = P[nombre]
+        series[nombre] = [None if pd.isna(v) else round(float(v), 2) for v in col]
+        valida = col.dropna()
+        if valida.empty:
+            continue
+        ult = float(valida.iloc[-1])
+        fecha_ult = valida.index[-1].strftime("%Y-%m-%d")
+        cambio = None
+        if len(valida) >= 2:
+            prev = float(valida.iloc[-2])
+            if prev != 0:
+                cambio = round((ult - prev) / prev * 100.0, 2)
+        resumen.append({"nombre": nombre, "grupo": grupo_de.get(nombre, ""),
+                        "valor": round(ult, 2), "cambio": cambio,
+                        "fecha": fecha_ult})
+
+    # Mundial primero, luego EE. UU., y dentro de cada grupo alfabético.
+    resumen.sort(key=lambda x: (x["grupo"] != "Mundial", x["nombre"]))
+    return {"fecha": fechas, "series": series, "resumen": resumen}
+
+
 def construir_acereras():
     """
     Descarga las acereras de cada grupo, arma dos índices base 100 y calcula
@@ -475,9 +524,13 @@ def construir_acereras():
     if "fecha" not in df.columns:        # por si el índice no se llamaba 'fecha'
         df = df.rename(columns={df.columns[0]: "fecha"})
 
+    # Precios individuales por acción (tarjetas + gráfica con selector, estilo divisas).
+    precios_export = _exportar_precios_acereras(
+        [(ACERERAS_MUNDIAL, p_m), (ACERERAS_EEUU, p_u)])
+
     info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
             "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
-            "fallaron": fail_m + fail_u}
+            "fallaron": fail_m + fail_u, "precios": precios_export}
     log(f"Correlación semanal acereras mundial vs. EE. UU. (desde {FECHA_INICIO}): {corr_global:.2f}")
     return df, info
 
@@ -921,6 +974,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None):
             "ok_mundial": ia.get("ok_mundial", []),
             "ok_eeuu": ia.get("ok_eeuu", []),
             "fallaron": ia.get("fallaron", []),
+            "precios": ia.get("precios"),
         }
 
     with open(ruta, "w", encoding="utf-8") as f:
