@@ -217,7 +217,38 @@ def log(msg):
 # 1) Descarga de datos
 # ------------------------------------------------------------------
 def obtener_henry_hub():
-    """Henry Hub spot diario desde EIA (serie NG.RNGWHHD.D)."""
+    """
+    Henry Hub diario. Fuente principal: futuro front-month NG=F vía Yahoo
+    (yfinance). Se prefiere sobre el spot de EIA porque es un precio forward
+    financiero: mucho más suave, sin los picos del mercado físico de contado.
+    Si Yahoo falla (a veces bloquea peticiones automatizadas en CI), cae de
+    vuelta al spot de EIA (NG.RNGWHHD.D) para que el panel nunca se quede sin
+    Henry Hub. La columna se mantiene como COL_HH para no romper nada aguas abajo.
+    """
+    # 1) Intento principal: Yahoo Finance NG=F (futuro front-month, continuo)
+    try:
+        import yfinance as yf
+        raw = yf.download("NG=F", start=FECHA_INICIO, interval="1d",
+                          auto_adjust=True, progress=False)
+        if (raw is not None and not raw.empty
+                and "Close" in raw.columns.get_level_values(0)):
+            close = raw["Close"]
+            if hasattr(close, "columns"):     # yfinance puede dar MultiIndex
+                close = close.iloc[:, 0]
+            df = close.reset_index()
+            df.columns = ["fecha", COL_HH]
+            df["fecha"] = pd.to_datetime(df["fecha"])
+            df[COL_HH] = pd.to_numeric(df[COL_HH], errors="coerce")
+            df = df.dropna()
+            df = df[df["fecha"] >= pd.Timestamp(FECHA_INICIO)].sort_values("fecha")
+            if not df.empty:
+                log(f"Henry Hub: Yahoo NG=F (futuro), {len(df)} días")
+                return df.reset_index(drop=True)
+        log("  Aviso: Yahoo NG=F vino vacío; uso respaldo EIA spot.")
+    except Exception as e:
+        log(f"  Aviso: Yahoo NG=F falló ({e}); uso respaldo EIA spot.")
+
+    # 2) Respaldo: spot diario de EIA (NG.RNGWHHD.D)
     url = "https://api.eia.gov/v2/seriesid/NG.RNGWHHD.D"
     r = requests.get(url, params={"api_key": EIA_API_KEY}, timeout=60)
     r.raise_for_status()
@@ -227,6 +258,7 @@ def obtener_henry_hub():
     df["fecha"] = pd.to_datetime(df["fecha"])
     df[COL_HH] = pd.to_numeric(df[COL_HH], errors="coerce")
     df = df[df["fecha"] >= FECHA_INICIO].sort_values("fecha")
+    log(f"Henry Hub: respaldo EIA spot, {len(df)} días")
     return df.reset_index(drop=True)
 
 
@@ -1075,7 +1107,8 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
     obj = {
         "generado": ahora_utc.strftime("%Y-%m-%d %H:%M UTC"),
         "generado_iso": ahora_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "fuentes": "Henry Hub: EIA · S&P 500, WTI, Brent, inflación, desempleo, PIB, "
+        "fuentes": "Henry Hub: Yahoo (futuro front-month NG=F), respaldo EIA · "
+                   "S&P 500, WTI, Brent, inflación, desempleo, PIB, "
                    "Housing Starts, Construction Spending, Chatarra (PPI): FRED · "
                    "Divisas: Frankfurter (BCE) · Acciones: Twelve Data",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
