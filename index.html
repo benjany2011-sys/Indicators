@@ -129,6 +129,7 @@
   <button class="tab" data-tab="acereras">Acereras</button>
   <button class="tab" data-tab="macro">Macro EE. UU.</button>
   <button class="tab" data-tab="construccion">Construcción</button>
+  <button class="tab" data-tab="chatarra">Chatarra</button>
   <button class="tab" data-tab="archivos">Archivos</button>
 </nav>
 
@@ -206,6 +207,15 @@
     <div class="seccion-titulo">Evolución</div>
     <div class="grid-graf" id="graf-construccion"></div>
     <div class="cobertura">Indicadores líderes de demanda de acero, vía FRED (datos del U.S. Census Bureau). Housing Starts: viviendas iniciadas, miles de unidades anualizadas (SAAR). Construction Spending: gasto total en construcción, anualizado (SAAR).</div>
+  </section>
+
+  <!-- CHATARRA -->
+  <section id="sec-chatarra">
+    <div class="seccion-titulo">Chatarra ferrosa EE. UU. — últimos valores</div>
+    <div class="cards" id="cards-chatarra"></div>
+    <div class="seccion-titulo">Evolución</div>
+    <div class="grid-graf" id="graf-chatarra"></div>
+    <div class="cobertura">Índices de precio del PPI (BLS), vía FRED. Son índices base 1982=100, <b>no</b> $/tonelada: el nivel no es comparable entre grados, pero el <b>% mensual</b> sí refleja el movimiento del mercado. Grados: HMS (Heavy Melting), Bundles (chatarra prime tipo busheling), Shredded (fragmentada) y el agregado de chatarra al carbono. Mensuales, con ~2 semanas de rezago. El número exacto en $/ton es data propietaria (Fastmarkets).</div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -455,6 +465,46 @@ function graficarConstruccion(){
   });
 }
 
+function construirChatarra(){
+  const cont=document.getElementById("cards-chatarra");
+  const graf=document.getElementById("graf-chatarra");
+  const lista = DATA.chatarra||[];
+  if(!lista.length){
+    if(cont) cont.innerHTML="<div class='card'><div class='nombre'>Chatarra</div>"+
+      "<div class='interp'>Sin datos en esta corrida.</div></div>";
+    return;
+  }
+  lista.forEach((ind, k)=>{
+    const v = ultimosDosMacro(ind.valores);   // [último, previo] no nulos
+    const ultVal = v.length ? v[0] : null;
+    // son índices: la lectura útil es el % de cambio mensual
+    let delta=null;
+    if(v.length>=2 && v[1]!==0) delta={pp:false, val:(v[0]-v[1])/v[1]*100};
+    const ultFecha = ind.fecha.length ? ind.fecha[ind.fecha.length-1] : "";
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML =
+      "<div class='nombre'>"+ind.nombre+"</div>"+
+      "<div class='valor'>"+fmtConstr(ultVal, ind)+"</div>"+
+      "<div class='delta-linea'>"+htmlDelta(delta)+"</div>"+
+      "<div class='interp'>"+(ind.unidad||"")+"</div>"+
+      "<div class='fecha'>"+ultFecha+"</div>";
+    cont.appendChild(card);
+    const panel=document.createElement("div"); panel.className="panel ancho";
+    panel.innerHTML="<h3>"+ind.nombre+"  ·  "+(ind.unidad||"")+"</h3>"+
+      "<div class='lienzo'><canvas id='c-chat-"+k+"'></canvas></div>";
+    graf.appendChild(panel);
+  });
+}
+
+function graficarChatarra(){
+  (DATA.chatarra||[]).forEach((ind, k)=>{
+    lineChart("c-chat-"+k, ind.fecha, [{data:ind.valores, borderColor:"#FF9D2E"}], {
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=> fmtConstr(c.parsed.y, ind) } } }
+    });
+  });
+}
+
 function etiquetaCorr(r){
   if(r===null || r===undefined) return "Sin dato suficiente";
   const ar=Math.abs(r);
@@ -570,6 +620,9 @@ function construirGraficas(tab){
   if(tab==="construccion"){
     graficarConstruccion();
   }
+  if(tab==="chatarra"){
+    graficarChatarra();
+  }
   if(tab==="acereras"){
     graficarAcereras();
   }
@@ -648,6 +701,7 @@ function render(d){
   });
   construirMacro();   // tarjetas + paneles de Macro EE. UU.
   construirConstruccion(); // tarjetas + paneles de Construcción
+  construirChatarra();     // tarjetas + paneles de Chatarra
   construirAcereras();// tarjeta de correlación + cobertura
 
   // pestañas
