@@ -106,6 +106,7 @@ MONEDAS = {
     "AUD": ("AUD por USD", "#,##0.0000"),
     "INR": ("INR por USD", "#,##0.00"),
     "KRW": ("KRW por USD", "#,##0.00"),
+    "COP": ("COP por USD", "#,##0.00"),
 }
 
 # Saneamiento: rangos realistas por serie. Cualquier dato fuera del rango se
