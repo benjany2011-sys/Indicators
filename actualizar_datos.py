@@ -102,11 +102,13 @@ MONEDAS = {
     "GBP": ("GBP por USD", "#,##0.0000"),
     "MXN": ("MXN por USD", "#,##0.0000"),
     "CAD": ("CAD por USD", "#,##0.0000"),
-    "CHF": ("CHF por USD", "#,##0.0000"),
+    "BRL": ("CHF por USD", "#,##0.0000"),
     "AUD": ("AUD por USD", "#,##0.0000"),
     "INR": ("INR por USD", "#,##0.00"),
     "KRW": ("KRW por USD", "#,##0.00"),
     "COP": ("COP por USD", "#,##0.00"),
+    "HKD": ("HKD por USD", "#,##0.00"),
+    "TRY": ("TRY por USD", "#,##0.00"),
 }
 
 # Saneamiento: rangos realistas por serie. Cualquier dato fuera del rango se
