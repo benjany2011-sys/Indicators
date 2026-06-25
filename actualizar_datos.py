@@ -9,7 +9,7 @@ Descarga y consolida en un solo Excel (bien formateado) las series:
   - WTI (petróleo, spot diario)                 -> FRED
   - Brent (petróleo, spot diario)               -> FRED
   - Tipo de cambio de 10 divisas vs. USD        -> Frankfurter (BCE)
-  - Acereras (acciones, índices base 100)        -> Twelve Data
+  - Acereras (acciones, índices base 100)        -> Twelve Data + Yahoo
 
 Todas las series diarias arrancan en 2021-01-01.
 
@@ -25,7 +25,7 @@ Cada vez que corre crea (junto al script) una carpeta `resultados` con:
 
 -------------------------------------------------------------------
 Requisitos (una sola vez):
-    pip install requests pandas matplotlib openpyxl
+    pip install requests pandas matplotlib openpyxl yfinance
 
 Llaves (EIA, FRED y Twelve Data):
   - En tu PC: archivo `.env` en la misma carpeta, con
@@ -35,8 +35,9 @@ Llaves (EIA, FRED y Twelve Data):
     (necesita además `pip install python-dotenv`)
   - En GitHub Actions: como Secrets del repo; el workflow las pasa
     como variables de entorno. No hace falta .env ni python-dotenv.
-  Frankfurter no necesita llave. Si falta TWELVEDATA_API_KEY, el panel
-  corre igual pero la sección de acereras se omite.
+  Frankfurter y Yahoo no necesitan llave. Si falta TWELVEDATA_API_KEY, el
+  panel corre igual: las acereras vía Yahoo (China, India) siguen entrando
+  y solo se omiten las que dependen de Twelve Data (ADRs en EE. UU.).
 ===================================================================
 """
 
@@ -139,10 +140,10 @@ def sanear(df, col):
 # Acereras que cotizan en bolsa, vía Twelve Data (símbolo -> nombre).
 # En el plan GRATIS de Twelve Data solo entran de forma fiable las acciones
 # listadas en EE. UU. (NYSE/Nasdaq). Por eso para las internacionales se usa su
-# ADR/listado en EE. UU. Las que solo cotizan fuera (Tata y JSW en India) y las
-# OTC inciertas se dejan abajo comentadas: si subes a un plan de pago, las
-# descomentas y listo. Si un símbolo no responde, el script lo salta y lo
-# reporta en "fallaron" (el índice equal-weight tolera entradas/salidas).
+# ADR/listado en EE. UU. Las que solo cotizan fuera (China e India) ahora se
+# jalan por Yahoo (ver ACERERAS_YAHOO más abajo). Si un símbolo no responde, el
+# script lo salta y lo reporta en "fallaron" (el índice equal-weight tolera
+# entradas/salidas).
 ACERERAS_MUNDIAL = {
     "MT":     "ArcelorMittal",     # NYSE
     "PKX":    "POSCO",             # NYSE (ADR)
@@ -151,8 +152,6 @@ ACERERAS_MUNDIAL = {
     "NPSCY":  "Nippon Steel",      # OTC (ADR) — puede requerir plan de pago
     "TKAMY":  "thyssenkrupp",      # OTC (ADR) — puede requerir plan de pago
     "SSAAY":  "SSAB",              # OTC (ADR) — puede requerir plan de pago
-    # "TATASTEEL:NSE": "Tata Steel",  # India: requiere plan de pago en Twelve Data
-    # "JSWSTEEL:NSE":  "JSW Steel",   # India: requiere plan de pago en Twelve Data
 }
 ACERERAS_EEUU = {
     "NUE":   "Nucor",
@@ -165,6 +164,28 @@ ACERERAS_EEUU = {
     "CRS":   "Carpenter Technology",
     "ZEUS":  "Olympic Steel",
     # "X":   "U.S. Steel",  # deslistada el 18-jun-2025 (compra de Nippon); ya no cotiza
+}
+
+# Acereras vía Yahoo Finance (gratis; cubre bolsas fuera de EE. UU. que el plan
+# gratis de Twelve Data no sirve). símbolo Yahoo -> (nombre, moneda de cotización).
+# La moneda se usa para convertir el precio a USD (par USD<moneda>=X de Yahoo),
+# para que las tarjetas en "$" sean honestas y el índice compare en una sola moneda.
+# Se suman al grupo "mundial". Rusia (Severstal, NLMK, MMK) se deja fuera a
+# propósito: con las sanciones, los datos de la bolsa de Moscú en Yahoo son poco
+# confiables. Si un símbolo no responde, el script lo salta y lo reporta en
+# "fallaron"; el índice equal-weight lo tolera.
+ACERERAS_YAHOO = {
+    # China — líder mundial; las matrices son estatales, cotizan vía filiales
+    "600019.SS":     ("Baoshan Iron & Steel",  "CNY"),  # brazo bursátil de Baowu (#1 mundial)
+    "0347.HK":       ("Angang Steel",           "HKD"),  # grupo Ansteel
+    "0323.HK":       ("Maanshan Iron & Steel",  "HKD"),
+    "000709.SZ":     ("HBIS",                    "CNY"),
+    "000959.SZ":     ("Shougang",                "CNY"),
+    # India — #2 mundial
+    "TATASTEEL.NS":  ("Tata Steel",   "INR"),
+    "JSWSTEEL.NS":   ("JSW Steel",    "INR"),
+    "SAIL.NS":       ("SAIL",         "INR"),
+    "JINDALSTEL.NS": ("Jindal Steel", "INR"),
 }
 
 # País de cada acerera, para etiquetar las tarjetas y el selector del panel web
@@ -182,6 +203,13 @@ PAIS_ACERERA = {
     "thyssenkrupp":         "Alemania",
     "Tata Steel":           "India",
     "JSW Steel":            "India",
+    "SAIL":                 "India",
+    "Jindal Steel":         "India",
+    "Baoshan Iron & Steel": "China",
+    "Angang Steel":         "China",
+    "Maanshan Iron & Steel": "China",
+    "HBIS":                 "China",
+    "Shougang":             "China",
     "Nucor":                "EE. UU.",
     "Steel Dynamics":       "EE. UU.",
     "Cleveland-Cliffs":     "EE. UU.",
@@ -434,7 +462,7 @@ def obtener_chatarra():
 
 
 # ------------------------------------------------------------------
-# 1b) Acereras: precios de acciones (Twelve Data) -> índices y correlación
+# 1b) Acereras: precios de acciones (Twelve Data + Yahoo) -> índices y correlación
 # ------------------------------------------------------------------
 def obtener_twelvedata(symbol, reintentos=4):
     """
@@ -513,6 +541,74 @@ def obtener_twelvedata(symbol, reintentos=4):
     return None
 
 
+_FX_YAHOO = {}   # cache: moneda -> Serie "unidades por 1 USD" (o None)
+
+
+def _fx_por_usd(moneda):
+    """Serie diaria 'unidades de <moneda> por 1 USD' desde Yahoo (par USD<moneda>=X).
+    Sirve para pasar a USD los precios que cotizan en otra moneda. Se cachea."""
+    if moneda == "USD":
+        return None
+    if moneda in _FX_YAHOO:
+        return _FX_YAHOO[moneda]
+    serie = None
+    try:
+        import yfinance as yf
+        raw = yf.download(f"USD{moneda}=X", start=FECHA_INICIO, interval="1d",
+                          auto_adjust=True, progress=False)
+        if (raw is not None and not raw.empty
+                and "Close" in raw.columns.get_level_values(0)):
+            close = raw["Close"]
+            if hasattr(close, "columns"):
+                close = close.iloc[:, 0]
+            serie = pd.to_numeric(close, errors="coerce")
+            serie.index = pd.to_datetime(serie.index)
+            serie = serie.dropna().sort_index()
+    except Exception as e:
+        log(f"  FX USD{moneda}=X (Yahoo) falló: {e}")
+    _FX_YAHOO[moneda] = serie
+    return serie
+
+
+def obtener_yahoo(symbol, moneda="USD", reintentos=3):
+    """Cierre diario de una acción desde Yahoo (yfinance), YA CONVERTIDO A USD
+    si 'moneda' no es USD. Cubre Shanghái (.SS), Shenzhen (.SZ), Hong Kong (.HK)
+    e India (.NS). Si el símbolo no responde, devuelve None y el índice lo tolera."""
+    import yfinance as yf
+    for intento in range(1, reintentos + 1):
+        try:
+            raw = yf.download(symbol, start=FECHA_INICIO, interval="1d",
+                              auto_adjust=True, progress=False)
+            if (raw is None or raw.empty
+                    or "Close" not in raw.columns.get_level_values(0)):
+                log(f"  Yahoo {symbol}: vacío (intento {intento}/{reintentos})")
+                time.sleep(2.0 * intento)
+                continue
+            close = raw["Close"]
+            if hasattr(close, "columns"):
+                close = close.iloc[:, 0]
+            s = pd.to_numeric(close, errors="coerce")
+            s.index = pd.to_datetime(s.index)
+            s = s.dropna().sort_index()
+            s = s[s.index >= pd.Timestamp(FECHA_INICIO)]
+            if s.empty:
+                log(f"  Yahoo {symbol}: 0 filas tras filtrar desde {FECHA_INICIO}")
+                return None
+            if moneda != "USD":                      # pasar a USD
+                fx = _fx_por_usd(moneda)             # unidades por 1 USD
+                if fx is None or fx.empty:
+                    log(f"  Yahoo {symbol}: sin FX {moneda}; queda en moneda local")
+                else:
+                    fx_al = fx.reindex(s.index, method="ffill")
+                    s = (s / fx_al).dropna()         # local / (local por USD) = USD
+            s.index.name = "fecha"
+            return s
+        except Exception as e:
+            log(f"  Yahoo {symbol} intento {intento}: {e}")
+            time.sleep(2.0 * intento)
+    return None
+
+
 def _indice_grupo(precios):
     """
     Índice equal-weight (base 100) a partir de los rendimientos diarios promedio
@@ -541,7 +637,7 @@ def _exportar_precios_acereras(grupos):
     'grupos' es una lista de (dic_ticker_a_nombre, precios_ticker_a_serie).
     Devuelve {"fecha": [...], "series": {nombre: [...]}, "resumen": [...]} o None.
     Los precios son el cierre tal cual lo entrega Twelve Data (USD para las que
-    cotizan en EE. UU.). Se redondean a 2 decimales.
+    cotizan en EE. UU.) o ya convertido a USD para las de Yahoo. Se redondean a 2.
     """
     cols = {}
     grupo_de = {}
@@ -586,14 +682,18 @@ def construir_acereras():
     """
     Descarga las acereras de cada grupo, arma dos índices base 100 y calcula
     su correlación (global y móvil a 90 días). Devuelve (df, info).
+
+    El grupo "mundial" mezcla dos fuentes: Twelve Data (ADRs listados en EE. UU.)
+    y Yahoo (China e India, que el plan gratis de Twelve Data no sirve).
     """
     if not TWELVEDATA_API_KEY:
-        log("  Aviso: falta TWELVEDATA_API_KEY; se omite la sección de acereras.")
-        return None, {"corr_global": None, "ok_mundial": [], "ok_eeuu": [],
-                      "fallaron": ["(sin TWELVEDATA_API_KEY)"]}
+        log("  Aviso: falta TWELVEDATA_API_KEY; las acereras vía Twelve Data se "
+            "omiten, pero las de Yahoo (China, India) sí entran.")
 
     def jalar(dic, etiqueta):
         precios, ok, fallaron = {}, [], []
+        if not TWELVEDATA_API_KEY:
+            return precios, ok, [f"{nom} ({tk})" for tk, nom in dic.items()]
         for tk, nom in dic.items():
             log(f"Descargando {nom} ({tk}) [{etiqueta}]...")
             s = obtener_twelvedata(tk)
@@ -605,8 +705,29 @@ def construir_acereras():
             time.sleep(8.0)   # plan gratis: máx. 8 peticiones/min -> 1 cada 8 s
         return precios, ok, fallaron
 
-    p_m, ok_m, fail_m = jalar(ACERERAS_MUNDIAL, "mundial")
-    p_u, ok_u, fail_u = jalar(ACERERAS_EEUU, "EE.UU.")
+    def jalar_yahoo(dic, etiqueta="mundial"):
+        precios, ok, fallaron, nombres = {}, [], [], {}
+        for tk, (nom, moneda) in dic.items():
+            log(f"Descargando {nom} ({tk}) [{etiqueta}/Yahoo {moneda}]...")
+            s = obtener_yahoo(tk, moneda=moneda)
+            nombres[tk] = nom
+            if s is None or getattr(s, "empty", True):
+                fallaron.append(f"{nom} ({tk})")
+            else:
+                precios[tk] = s
+                ok.append(nom)
+            time.sleep(1.5)   # Yahoo no tiene el límite estricto de Twelve Data
+        return precios, ok, fallaron, nombres
+
+    p_m, ok_m, fail_m       = jalar(ACERERAS_MUNDIAL, "mundial")   # Twelve Data (ADRs)
+    p_y, ok_y, fail_y, nm_y = jalar_yahoo(ACERERAS_YAHOO)          # Yahoo (China, India)
+    p_u, ok_u, fail_u       = jalar(ACERERAS_EEUU, "EE.UU.")       # Twelve Data
+
+    # mezcla Twelve Data + Yahoo en un solo grupo "mundial"
+    NOMBRES_MUNDIAL = {**ACERERAS_MUNDIAL, **nm_y}
+    p_m    = {**p_m, **p_y}
+    ok_m   = ok_m + ok_y
+    fail_m = fail_m + fail_y
 
     idx_m = _indice_grupo(p_m)
     idx_u = _indice_grupo(p_u)
@@ -641,7 +762,7 @@ def construir_acereras():
 
     # Precios individuales por acción (tarjetas + gráfica con selector, estilo divisas).
     precios_export = _exportar_precios_acereras(
-        [(ACERERAS_MUNDIAL, p_m), (ACERERAS_EEUU, p_u)])
+        [(NOMBRES_MUNDIAL, p_m), (ACERERAS_EEUU, p_u)])
 
     info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
             "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
@@ -1113,7 +1234,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
         "fuentes": "Henry Hub: Yahoo (futuro front-month NG=F), respaldo EIA · "
                    "S&P 500, WTI, Brent, inflación, desempleo, PIB, "
                    "Housing Starts, Construction Spending, Chatarra (PPI): FRED · "
-                   "Divisas: Frankfurter (BCE) · Acciones: Twelve Data",
+                   "Divisas: Frankfurter (BCE) · Acciones: Twelve Data y Yahoo",
         "fechas": diario["fecha"].dt.strftime("%Y-%m-%d").tolist(),
         "series": series,
         "monedas": [label for (_iso, (label, _f)) in MONEDAS.items()],
@@ -1172,7 +1293,7 @@ def main():
             log(f"  Aviso: la sección de chatarra falló y se omite: {e}")
             chatarra = None
 
-        log("Descargando acereras (Twelve Data)...")
+        log("Descargando acereras (Twelve Data + Yahoo)...")
         try:
             acereras, info_ac = construir_acereras()
         except Exception as e:
