@@ -1,43 +1,44 @@
 """
 actualizar_datos.py
 ===================================================================
-Descarga y consolida en un solo Excel (bien formateado) las series:
+Este es el motor de mi dashboard. Corre solo todos los días por GitHub
+Actions, jala todo de las APIs y deja listo el datos.json que lee el
+index.html. Lo que estoy bajando:
 
-  - Henry Hub (gas natural, spot diario)        -> EIA
-  - Inflación de EE. UU. (CPI y variación YoY)  -> FRED
-  - S&P 500 (índice diario)                     -> FRED
-  - WTI (petróleo, spot diario)                 -> FRED
-  - Brent (petróleo, spot diario)               -> FRED
-  - Tipo de cambio de 10 divisas vs. USD        -> Frankfurter (BCE)
-  - Acereras (acciones, índices base 100)        -> Twelve Data + Yahoo
+  - Henry Hub (gas natural)        -> Yahoo NG=F, y si falla, EIA spot
+  - Inflación EE. UU. (CPI + YoY)  -> FRED
+  - S&P 500                        -> FRED
+  - WTI                            -> FRED
+  - Brent                          -> FRED
+  - 13 divisas vs. USD             -> Frankfurter (BCE)
+  - Acereras (acciones base 100)   -> Twelve Data + Yahoo
 
-Todas las series diarias arrancan en 2021-01-01.
+Todo arranca en 2021-01-01 para tener una base común.
 
-Las divisas vienen de Frankfurter (tipos de referencia del Banco Central
-Europeo). Con base=USD salen ya como "unidades por 1 USD" (18 pesos, 157
-yenes, etc.), sin necesidad de invertir, y se publican el mismo día hábil
-(~16:00 hora de Europa central), más fresco que FRED.
+Las divisas las saco de Frankfurter porque con base=USD ya vienen como
+"unidades por 1 USD" (18 pesos, 157 yenes...), sin tener que invertir nada,
+y salen el mismo día hábil ~16:00 hora de Europa. Más fresco que FRED.
 
-Cada vez que corre crea (junto al script) una carpeta `resultados` con:
+Cada corrida me deja en la carpeta `resultados`:
   - mercados_AAAA-MM-DD.xlsx  y  mercados_reciente.xlsx
   - graficos_AAAA-MM-DD.png   y  graficos_reciente.png
   - registro.log
 
 -------------------------------------------------------------------
-Requisitos (una sola vez):
+Si lo corro local, una sola vez:
     pip install requests pandas matplotlib openpyxl yfinance
 
-Llaves (EIA, FRED y Twelve Data):
-  - En tu PC: archivo `.env` en la misma carpeta, con
-        EIA_API_KEY=tu_llave_de_eia
-        FRED_API_KEY=tu_llave_de_fred
-        TWELVEDATA_API_KEY=tu_llave_de_twelvedata
-    (necesita además `pip install python-dotenv`)
-  - En GitHub Actions: como Secrets del repo; el workflow las pasa
-    como variables de entorno. No hace falta .env ni python-dotenv.
-  Frankfurter y Yahoo no necesitan llave. Si falta TWELVEDATA_API_KEY, el
-  panel corre igual: las acereras vía Yahoo (China, India) siguen entrando
-  y solo se omiten las que dependen de Twelve Data (ADRs en EE. UU.).
+Las llaves (EIA, FRED, Twelve Data):
+  - En mi PC: un .env aquí mismo con
+        EIA_API_KEY=...
+        FRED_API_KEY=...
+        TWELVEDATA_API_KEY=...
+    (para eso también va `pip install python-dotenv`)
+  - En GitHub Actions van como Secrets del repo y el workflow las mete
+    como variables de entorno. Ahí no necesito ni .env ni dotenv.
+  Frankfurter y Yahoo no piden llave. Si un día se me cae la de Twelve Data
+  no pasa nada: las acereras de China/India (Yahoo) siguen entrando y solo
+  se me caen las que dependen de Twelve Data (los ADRs gringos).
 ===================================================================
 """
 
@@ -51,11 +52,11 @@ from pathlib import Path
 import requests
 import pandas as pd
 import matplotlib
-matplotlib.use("Agg")                 # sin ventana, solo guarda PNG
+matplotlib.use("Agg")                 # modo sin ventana, solo me guarda el PNG
 import matplotlib.pyplot as plt
 
-# python-dotenv es opcional: en tu PC lee el .env; en GitHub Actions
-# las llaves vienen de los Secrets y este import simplemente se omite.
+# dotenv es opcional: en mi PC me lee el .env, y en GitHub Actions las llaves
+# ya vienen de los Secrets, así que si no está instalado me lo salto y ya.
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -68,15 +69,15 @@ from openpyxl.utils import get_column_letter
 from openpyxl.chart import LineChart, Reference
 
 # ------------------------------------------------------------------
-# 0) Configuración
+# 0) Config
 # ------------------------------------------------------------------
 EIA_API_KEY = os.getenv("EIA_API_KEY")
 FRED_API_KEY = os.getenv("FRED_API_KEY")
-# Acereras (acciones) vienen ahora de Twelve Data. El workflow ya inyecta este
-# Secret como variable de entorno; en tu PC va en el .env como las otras.
+# Las acciones de acereras las jalo de Twelve Data. El workflow ya me mete
+# este Secret como variable de entorno; en mi PC va en el .env como las demás.
 TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 
-FECHA_INICIO = "2021-01-01"           # arranque común de todas las series
+FECHA_INICIO = "2021-01-01"           # de aquí arranco todo, para tener base pareja
 
 CARPETA = Path(__file__).resolve().parent / "resultados"
 CARPETA.mkdir(exist_ok=True)
@@ -87,15 +88,15 @@ LOG = CARPETA / "registro.log"
 COL_HH = "Henry Hub ($/MMBtu)"
 FMT_HH = "#,##0.00"
 
-# Series diarias de FRED: id -> (nombre de columna, formato numérico)
+# Series diarias de FRED: id -> (nombre de columna, formato)
 FRED_DIARIAS = {
     "SP500":        ("S&P 500",       "#,##0.00"),
     "DCOILWTICO":   ("WTI ($/bbl)",   "#,##0.00"),
     "DCOILBRENTEU": ("Brent ($/bbl)", "#,##0.00"),
 }
 
-# Divisas vía Frankfurter (BCE). base=USD -> "unidades por 1 USD".
-# código ISO -> (nombre de columna, formato numérico)
+# Divisas por Frankfurter (BCE). base=USD -> "unidades por 1 USD".
+# código ISO -> (nombre de columna, formato)
 MONEDAS = {
     "EUR": ("EUR por USD", "#,##0.0000"),
     "JPY": ("JPY por USD", "#,##0.00"),
@@ -112,11 +113,11 @@ MONEDAS = {
     "TRY": ("TRY por USD", "#,##0.00"),
 }
 
-# Saneamiento: rangos realistas por serie. Cualquier dato fuera del rango se
-# considera erróneo (picos falsos de la fuente) y se marca como vacío; la línea
-# de la gráfica simplemente lo salta. Nota: el límite alto de Henry Hub (25)
-# conserva el pico real del invierno 2021 (tormenta Uri) pero descarta valores
-# imposibles como ~30. Ajusta estos números si algún día resultan muy estrechos.
+# Saneamiento: rangos realistas por serie. Si un dato cae fuera del rango lo
+# trato como basura de la fuente (picos falsos) y lo dejo vacío; la línea de la
+# gráfica simplemente lo brinca. Ojo: el techo de Henry Hub (25) me deja vivo el
+# pico real del invierno 2021 (tormenta Uri) pero tira valores imposibles tipo
+# ~30. Si algún día me quedan cortos estos números, los aflojo aquí.
 RANGOS_VALIDOS = {
     COL_HH:           (0.5, 25.0),    # Henry Hub $/MMBtu
     "WTI ($/bbl)":    (5.0, 250.0),   # WTI $/bbl
@@ -125,7 +126,7 @@ RANGOS_VALIDOS = {
 
 
 def sanear(df, col):
-    """Marca como vacío los valores de 'col' fuera de su rango realista."""
+    """Deja en vacío los valores de 'col' que se salen de su rango realista."""
     if col not in RANGOS_VALIDOS or col not in df.columns:
         return df
     lo, hi = RANGOS_VALIDOS[col]
@@ -138,20 +139,19 @@ def sanear(df, col):
 
 
 # Acereras que cotizan en bolsa, vía Twelve Data (símbolo -> nombre).
-# En el plan GRATIS de Twelve Data solo entran de forma fiable las acciones
-# listadas en EE. UU. (NYSE/Nasdaq). Por eso para las internacionales se usa su
-# ADR/listado en EE. UU. Las que solo cotizan fuera (China e India) ahora se
-# jalan por Yahoo (ver ACERERAS_YAHOO más abajo). Si un símbolo no responde, el
-# script lo salta y lo reporta en "fallaron" (el índice equal-weight tolera
-# entradas/salidas).
+# Con el plan GRATIS de Twelve Data solo me entran bien las acciones listadas en
+# EE. UU. (NYSE/Nasdaq), así que para las de afuera uso su ADR gringo. Las que
+# solo cotizan fuera (China e India) las jalo por Yahoo (ver ACERERAS_YAHOO más
+# abajo). Si un símbolo no contesta, lo brinco y lo apunto en "fallaron" — el
+# índice equal-weight aguanta que entren y salgan empresas sin despeinarse.
 ACERERAS_MUNDIAL = {
     "MT":     "ArcelorMittal",     # NYSE
     "PKX":    "POSCO",             # NYSE (ADR)
     "TX":     "Ternium",           # NYSE
     "GGB":    "Gerdau",            # NYSE
-    "NPSCY":  "Nippon Steel",      # OTC (ADR) — puede requerir plan de pago
-    "TKAMY":  "thyssenkrupp",      # OTC (ADR) — puede requerir plan de pago
-    "SSAAY":  "SSAB",              # OTC (ADR) — puede requerir plan de pago
+    "NPSCY":  "Nippon Steel",      # OTC (ADR) — a veces pide plan de pago
+    "TKAMY":  "thyssenkrupp",      # OTC (ADR) — a veces pide plan de pago
+    "SSAAY":  "SSAB",              # OTC (ADR) — a veces pide plan de pago
 }
 ACERERAS_EEUU = {
     "NUE":   "Nucor",
@@ -163,36 +163,35 @@ ACERERAS_EEUU = {
     "ATI":   "ATI",
     "CRS":   "Carpenter Technology",
     "ZEUS":  "Olympic Steel",
-    # "X":   "U.S. Steel",  # deslistada el 18-jun-2025 (compra de Nippon); ya no cotiza
+    # "X":   "U.S. Steel",  # la deslistaron el 18-jun-2025 (la compró Nippon); ya no cotiza
 }
 
-# Acereras vía Yahoo Finance (gratis; cubre bolsas fuera de EE. UU. que el plan
-# gratis de Twelve Data no sirve). símbolo Yahoo -> (nombre, moneda de cotización).
-# La moneda se usa para convertir el precio a USD (par USD<moneda>=X de Yahoo),
-# para que las tarjetas en "$" sean honestas y el índice compare en una sola moneda.
-# Se suman al grupo "mundial". Rusia (Severstal, NLMK, MMK) se deja fuera a
-# propósito: con las sanciones, los datos de la bolsa de Moscú en Yahoo son poco
-# confiables. Si un símbolo no responde, el script lo salta y lo reporta en
-# "fallaron"; el índice equal-weight lo tolera.
+# Acereras vía Yahoo (gratis y sí cubre bolsas de fuera que el plan gratis de
+# Twelve Data no me da). símbolo Yahoo -> (nombre, moneda en que cotiza).
+# La moneda la uso para pasar el precio a USD (par USD<moneda>=X de Yahoo), así
+# las tarjetas en "$" no mienten y el índice compara todo en una sola moneda.
+# Estas se suman al grupo "mundial". A Rusia (Severstal, NLMK, MMK) la dejo fuera
+# a propósito: con las sanciones, lo que da Yahoo de la bolsa de Moscú no es
+# confiable. Si un símbolo no responde, lo brinco y va a "fallaron".
 ACERERAS_YAHOO = {
-    # China — líder mundial; las matrices son estatales, cotizan vía filiales
-    "600019.SS":     ("Baoshan Iron & Steel",  "CNY"),  # brazo bursátil de Baowu (#1 mundial)
+    # China — el #1 del mundo; las matrices son estatales y cotizan vía filiales
+    "600019.SS":     ("Baoshan Iron & Steel",  "CNY"),  # el brazo bursátil de Baowu (#1 mundial)
     "0347.HK":       ("Angang Steel",           "HKD"),  # grupo Ansteel
     "0323.HK":       ("Maanshan Iron & Steel",  "HKD"),
     "000709.SZ":     ("HBIS",                    "CNY"),
     "000959.SZ":     ("Shougang",                "CNY"),
-    # India — #2 mundial
+    # India — el #2 del mundo
     "TATASTEEL.NS":  ("Tata Steel",   "INR"),
     "JSWSTEEL.NS":   ("JSW Steel",    "INR"),
     "SAIL.NS":       ("SAIL",         "INR"),
     "JINDALSTEL.NS": ("Jindal Steel", "INR"),
 }
 
-# País de cada acerera, para etiquetar las tarjetas y el selector del panel web
-# (sustituye al genérico "Mundial"). Si una empresa no aparece aquí, se usa su
-# grupo como respaldo. Edita libremente: Ternium, por ejemplo, está domiciliada
+# El país de cada acerera, para etiquetar las tarjetas y el selector del panel
+# (en lugar del genérico "Mundial"). Si una empresa no está aquí, uso su grupo
+# grupo como respaldo. Lo edito a gusto: Ternium, por ejemplo, está domiciliada
 # en Luxemburgo pero opera sobre todo en México/Argentina (grupo Techint), así
-# que puedes cambiarla a "México" si lo prefieres.
+# que la puedo poner como "México" si quiero.
 PAIS_ACERERA = {
     "ArcelorMittal":        "Luxemburgo",
     "Gerdau":               "Brasil",
@@ -222,14 +221,14 @@ PAIS_ACERERA = {
     "Olympic Steel":        "EE. UU.",
 }
 
-# Para cada divisa se agrega además la columna inversa "USD por <ISO>"
+# A cada divisa le agrego también la columna inversa "USD por <ISO>"
 # (cuántos dólares vale 1 unidad de esa moneda = 1 / "X por USD").
-# Se usan 6 decimales porque las inversas van de ~1.16 (EUR) a ~0.0008 (KRW).
+# Uso 6 decimales porque las inversas van desde ~1.16 (EUR) hasta ~0.0008 (KRW).
 FMT_INV = "#,##0.000000"
 
 
 def _fx_columns():
-    """(nombre, formato) de las columnas de divisas: directa + inversa, en orden."""
+    """(nombre, formato) de las columnas de divisas: la directa + la inversa, en orden."""
     cols = []
     for iso, (label, fmt) in MONEDAS.items():
         cols.append((label, fmt))
@@ -249,14 +248,14 @@ def log(msg):
 # ------------------------------------------------------------------
 def obtener_henry_hub():
     """
-    Henry Hub diario. Fuente principal: futuro front-month NG=F vía Yahoo
-    (yfinance). Se prefiere sobre el spot de EIA porque es un precio forward
-    financiero: mucho más suave, sin los picos del mercado físico de contado.
-    Si Yahoo falla (a veces bloquea peticiones automatizadas en CI), cae de
-    vuelta al spot de EIA (NG.RNGWHHD.D) para que el panel nunca se quede sin
-    Henry Hub. La columna se mantiene como COL_HH para no romper nada aguas abajo.
+    Henry Hub diario. Lo principal lo saco del futuro front-month NG=F por Yahoo
+    (yfinance). Lo prefiero sobre el spot de EIA porque es un precio forward
+    financiero: sale mucho más suave, sin los brincos del mercado físico de
+    contado. Si Yahoo se cae (a veces bloquea peticiones automáticas en CI), me
+    voy de respaldo al spot de EIA (NG.RNGWHHD.D) para nunca quedarme sin Henry
+    Hub. Dejo el nombre de columna como COL_HH para no romper nada más adelante.
     """
-    # 1) Intento principal: Yahoo Finance NG=F (futuro front-month, continuo)
+    # 1) Plan A: Yahoo NG=F (futuro front-month, continuo)
     try:
         import yfinance as yf
         raw = yf.download("NG=F", start=FECHA_INICIO, interval="1d",
@@ -264,7 +263,7 @@ def obtener_henry_hub():
         if (raw is not None and not raw.empty
                 and "Close" in raw.columns.get_level_values(0)):
             close = raw["Close"]
-            if hasattr(close, "columns"):     # yfinance puede dar MultiIndex
+            if hasattr(close, "columns"):     # yfinance a veces me da MultiIndex
                 close = close.iloc[:, 0]
             df = close.reset_index()
             df.columns = ["fecha", COL_HH]
@@ -279,7 +278,7 @@ def obtener_henry_hub():
     except Exception as e:
         log(f"  Aviso: Yahoo NG=F falló ({e}); uso respaldo EIA spot.")
 
-    # 2) Respaldo: spot diario de EIA (NG.RNGWHHD.D)
+    # 2) Plan B: spot diario de EIA (NG.RNGWHHD.D)
     url = "https://api.eia.gov/v2/seriesid/NG.RNGWHHD.D"
     r = requests.get(url, params={"api_key": EIA_API_KEY}, timeout=60)
     r.raise_for_status()
@@ -294,7 +293,7 @@ def obtener_henry_hub():
 
 
 def obtener_fred(series_id, observation_start=FECHA_INICIO):
-    """Una serie diaria/mensual de FRED -> DataFrame[fecha, valor]."""
+    """Una serie diaria/mensual de FRED -> DataFrame[fecha, valor]. Mi función comodín."""
     url = "https://api.stlouisfed.org/fred/series/observations"
     params = {
         "series_id": series_id,
@@ -315,15 +314,16 @@ def obtener_fred(series_id, observation_start=FECHA_INICIO):
 def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     """
     Tipo de cambio diario desde Frankfurter (tipos de referencia del BCE).
-    base=USD devuelve "unidades por 1 USD" directamente, sin invertir.
-    Pide SOLO las divisas de MONEDAS (symbols) para que la respuesta sea
-    chica y no se corte; reintenta si la conexión se cae.
+    Con base=USD me da "unidades por 1 USD" directo, sin invertir nada. Pido
+    SOLO las divisas de MONEDAS para que la respuesta sea chica y no se me corte;
+    si la conexión se cae, reintenta. (Esto lo blindé porque el API se cayó una
+    vez y me tumbó toda la corrida.)
     """
     url = "https://api.frankfurter.dev/v2/rates"
     params = {
         "base": "USD",
         "from": desde,
-        "quotes": ",".join(MONEDAS.keys()),   # solo tus 10 divisas (param v2)
+        "quotes": ",".join(MONEDAS.keys()),   # solo mis divisas (param de la v2)
     }
     ultimo_error = None
     for intento in range(1, reintentos + 1):
@@ -342,8 +342,8 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     else:
         raise ultimo_error
 
-    # Frankfurter v2 devuelve una lista de registros {date, base, quote, rate}.
-    # Dejamos el parser tolerante por si el rango llega como dict anidado.
+    # Frankfurter v2 me devuelve una lista de registros {date, base, quote, rate}.
+    # Dejo el parser tolerante por si el rango llega como dict anidado.
     if isinstance(data, list):
         df = pd.DataFrame(data)
     elif isinstance(data, dict) and "rates" in data:
@@ -367,7 +367,7 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
     wide = wide.rename(columns={c: MONEDAS[c][0] for c in MONEDAS if c in wide.columns})
     wide.columns.name = None
 
-    # agrega la columna inversa (USD por X) junto a cada divisa y ordena
+    # le pego la columna inversa (USD por X) junto a cada divisa y ordeno
     orden = ["fecha"]
     for iso, (label, _fmt) in MONEDAS.items():
         if label in wide.columns:
@@ -378,8 +378,8 @@ def obtener_fx(desde=FECHA_INICIO, reintentos=3):
 
 
 def obtener_inflacion():
-    """CPI mensual (CPIAUCSL) + variación interanual."""
-    # tomamos 13 meses antes del inicio para poder calcular el YoY de enero-2021
+    """CPI mensual (CPIAUCSL) + la variación interanual."""
+    # me echo 13 meses para atrás del inicio para poder calcular el YoY de enero-2021
     df = obtener_fred("CPIAUCSL", observation_start="2019-12-01")
     df = df.rename(columns={"valor": "CPI"}).sort_values("fecha")
     df["Inflacion YoY"] = df["CPI"].pct_change(12)   # fracción (0.034 = 3.4%)
@@ -389,12 +389,12 @@ def obtener_inflacion():
 
 def obtener_macro():
     """
-    Indicadores macro de EE. UU. (FRED), en una sola tabla mensual:
+    Macro de EE. UU. (FRED), todo en una sola tabla mensual:
       - Inflación YoY (CPI)            fracción (0.03 = 3%)
       - Desempleo                      % (UNRATE), mensual
       - PIB real (crec. anualizado)    % (A191RL1Q225SBEA), trimestral
-    El PIB es trimestral, así que solo tiene dato en meses de fin de trimestre;
-    el resto de filas queda en blanco, lo cual es normal.
+    El PIB es trimestral, así que solo trae dato en meses de fin de trimestre;
+    el resto de filas quedan en blanco y eso es normal, no es un bug.
     """
     infl = obtener_inflacion()[["fecha", "CPI", "Inflacion YoY"]]
 
@@ -411,20 +411,20 @@ def obtener_macro():
 
 def obtener_construccion():
     """
-    Indicadores de construcción de EE. UU. (FRED, datos del Census), mensuales.
-    Son indicadores líderes de demanda de acero:
+    Construcción de EE. UU. (FRED, datos del Census), mensual. Para mí son
+    indicadores líderes de demanda de acero:
       - Housing Starts        viviendas iniciadas, miles de unidades, SAAR (HOUST)
       - Construction Spending gasto total en construcción, SAAR (TTLCONS).
-                              FRED lo entrega en MILLONES de USD; aquí se pasa a
-                              MILES DE MILLONES para que la cifra sea legible.
-    Devuelve un DataFrame [fecha, Housing Starts, Construction Spending] o None.
+                              FRED me lo da en MILLONES de USD; aquí lo paso a
+                              MILES DE MILLONES para que la cifra se lea bien.
+    Devuelve [fecha, Housing Starts, Construction Spending] o None.
     """
     log("Descargando Housing Starts (FRED:HOUST)...")
     hs = obtener_fred("HOUST").rename(columns={"valor": "Housing Starts"})
 
     log("Descargando Construction Spending (FRED:TTLCONS)...")
     cs = obtener_fred("TTLCONS").rename(columns={"valor": "Construction Spending"})
-    cs["Construction Spending"] = cs["Construction Spending"] / 1000.0  # millones -> miles de millones
+    cs["Construction Spending"] = cs["Construction Spending"] / 1000.0  # de millones a miles de millones
 
     con = hs.merge(cs, on="fecha", how="outer")
     con = con[con["fecha"] >= FECHA_INICIO].sort_values("fecha").reset_index(drop=True)
@@ -433,9 +433,9 @@ def obtener_construccion():
 
 # Chatarra ferrosa (FRED / BLS, PPI por commodity), mensual.
 #   id de FRED -> nombre de columna
-# OJO: son ÍNDICES de precio (base 1982=100), NO dólares por tonelada. El nivel
-# crudo no es comparable entre grados; lo que importa es el % de cambio mensual,
-# que es justo lo que pinta el panel en la tarjeta.
+# OJO conmigo mismo: esto son ÍNDICES de precio (base 1982=100), NO dólares por
+# tonelada. El nivel crudo no se compara entre grados; lo que sirve es el % de
+# cambio mensual, que es justo lo que pinto en la tarjeta del panel.
 FRED_CHATARRA = {
     "WPU10121191": "HMS (Heavy Melting)",
     "WPU10121192": "Bundles (prime)",
@@ -446,9 +446,9 @@ FRED_CHATARRA = {
 
 def obtener_chatarra():
     """
-    Índices de precio de chatarra ferrosa de EE. UU. (FRED, PPI del BLS), mensuales.
-    Es el insumo metálico #1 del melt shop, así que sirve como termómetro de costo.
-    Devuelve un DataFrame [fecha, <grados...>] o None.
+    Índices de precio de chatarra ferrosa de EE. UU. (FRED, PPI del BLS),
+    mensual. Es el insumo metálico #1 del melt shop, así que me sirve como
+    termómetro de costo. Devuelve [fecha, <grados...>] o None.
     """
     df = None
     for sid, nombre in FRED_CHATARRA.items():
@@ -467,16 +467,17 @@ def obtener_chatarra():
 def obtener_twelvedata(symbol, reintentos=4):
     """
     Cierre diario de una acción desde Twelve Data (JSON, con llave).
-    Devuelve una Serie indexada por fecha, o None. Registra POR QUÉ falla.
+    Me devuelve una Serie indexada por fecha, o None. Y registra POR QUÉ falló,
+    que eso me ahorró horas de debug.
 
-    Notas sobre el plan GRATIS de Twelve Data:
-      - Límite de frecuencia: 8 peticiones por minuto (el throttle real va en
-        'jalar', que espera entre símbolo y símbolo).
-      - Límite diario: 800 créditos; cada llamada aquí cuesta 1 crédito.
-      - Si se topa con el límite (code 429 / "credits"), espera ~65 s y reintenta.
-      - Si el símbolo no existe o el plan no lo cubre, no insiste: lo salta.
-    Twelve Data devuelve HTTP 200 incluso en errores lógicos; el detalle viene
-    en el campo 'status'/'code' del JSON, así que eso es lo que revisamos.
+    Lo que tengo que recordar del plan GRATIS de Twelve Data:
+      - Frecuencia: 8 peticiones por minuto (el throttle real lo manejo en
+        'jalar', esperando entre símbolo y símbolo).
+      - Tope diario: 800 créditos; cada llamada de aquí gasta 1.
+      - Si pego con el tope (code 429 / "credits"), espero ~65 s y reintento.
+      - Si el símbolo no existe o el plan no lo cubre, no insisto: lo brinco.
+    Twelve Data me devuelve HTTP 200 hasta cuando hay error lógico; el detalle
+    real viene en el campo 'status'/'code' del JSON, así que eso es lo que reviso.
     """
     if not TWELVEDATA_API_KEY:
         log(f"  TwelveData {symbol}: falta TWELVEDATA_API_KEY (Secret del repo / .env)")
@@ -487,7 +488,7 @@ def obtener_twelvedata(symbol, reintentos=4):
         "symbol":     symbol,
         "interval":   "1day",
         "start_date": FECHA_INICIO,
-        "outputsize": 5000,          # cubre de 2021 a hoy con margen de sobra
+        "outputsize": 5000,          # de 2021 a hoy me sobra con esto
         "order":      "ASC",
         "apikey":     TWELVEDATA_API_KEY,
         "format":     "JSON",
@@ -512,7 +513,7 @@ def obtener_twelvedata(symbol, reintentos=4):
                     log(f"  TwelveData {symbol}: LÍMITE (code {code}) -> espero {espera}s -> '{msg}'")
                     time.sleep(espera)
                     continue
-                # Símbolo inexistente o no cubierto por el plan: no insistir.
+                # Símbolo que no existe o que mi plan no cubre: no insisto.
                 log(f"  TwelveData {symbol}: ERROR (code {code}) -> '{msg}'")
                 return None
 
@@ -546,7 +547,8 @@ _FX_YAHOO = {}   # cache: moneda -> Serie "unidades por 1 USD" (o None)
 
 def _fx_por_usd(moneda):
     """Serie diaria 'unidades de <moneda> por 1 USD' desde Yahoo (par USD<moneda>=X).
-    Sirve para pasar a USD los precios que cotizan en otra moneda. Se cachea."""
+    La uso para pasar a USD los precios que cotizan en otra moneda. La cacheo
+    para no pedir el mismo par dos veces."""
     if moneda == "USD":
         return None
     if moneda in _FX_YAHOO:
@@ -571,9 +573,9 @@ def _fx_por_usd(moneda):
 
 
 def obtener_yahoo(symbol, moneda="USD", reintentos=3):
-    """Cierre diario de una acción desde Yahoo (yfinance), YA CONVERTIDO A USD
-    si 'moneda' no es USD. Cubre Shanghái (.SS), Shenzhen (.SZ), Hong Kong (.HK)
-    e India (.NS). Si el símbolo no responde, devuelve None y el índice lo tolera."""
+    """Cierre diario de una acción desde Yahoo (yfinance), YA PASADO A USD si
+    'moneda' no es USD. Cubre Shanghái (.SS), Shenzhen (.SZ), Hong Kong (.HK) e
+    India (.NS). Si el símbolo no contesta, devuelvo None y el índice lo aguanta."""
     import yfinance as yf
     for intento in range(1, reintentos + 1):
         try:
@@ -594,10 +596,10 @@ def obtener_yahoo(symbol, moneda="USD", reintentos=3):
             if s.empty:
                 log(f"  Yahoo {symbol}: 0 filas tras filtrar desde {FECHA_INICIO}")
                 return None
-            if moneda != "USD":                      # pasar a USD
+            if moneda != "USD":                      # lo paso a USD
                 fx = _fx_por_usd(moneda)             # unidades por 1 USD
                 if fx is None or fx.empty:
-                    log(f"  Yahoo {symbol}: sin FX {moneda}; queda en moneda local")
+                    log(f"  Yahoo {symbol}: sin FX {moneda}; lo dejo en moneda local")
                 else:
                     fx_al = fx.reindex(s.index, method="ffill")
                     s = (s / fx_al).dropna()         # local / (local por USD) = USD
@@ -611,9 +613,10 @@ def obtener_yahoo(symbol, moneda="USD", reintentos=3):
 
 def _indice_grupo(precios):
     """
-    Índice equal-weight (base 100) a partir de los rendimientos diarios promedio
-    de las acciones del grupo. Así entran/salen empresas sin saltos artificiales.
-    Recorta movimientos diarios a ±50% para evitar artefactos por splits.
+    Índice equal-weight (base 100) armado con el rendimiento diario promedio de
+    las acciones del grupo. Lo hago así para que entren/salgan empresas sin
+    saltos artificiales. Recorto los movimientos diarios a ±50% para que un split
+    no me ensucie el índice.
     """
     rets = {}
     for tk, s in precios.items():
@@ -624,20 +627,20 @@ def _indice_grupo(precios):
     if not rets:
         return None
     R = pd.DataFrame(rets).sort_index()
-    prom = R.mean(axis=1, skipna=True).fillna(0.0)   # rendimiento equal-weight
+    prom = R.mean(axis=1, skipna=True).fillna(0.0)   # rendimiento equal-weight del grupo
     return 100.0 * (1 + prom).cumprod()
 
 
 def _exportar_precios_acereras(grupos):
     """
-    Arma la estructura de PRECIOS por acción para el panel web, al estilo de las
-    divisas: una tarjeta por empresa (último precio + % de cambio + fecha) y una
-    serie completa por empresa para la gráfica con selector.
+    Armo la estructura de PRECIOS por acción para el panel, al estilo de las
+    divisas: una tarjeta por empresa (último precio + % de cambio + fecha) y la
+    serie completa de cada una para la gráfica con selector.
 
     'grupos' es una lista de (dic_ticker_a_nombre, precios_ticker_a_serie).
     Devuelve {"fecha": [...], "series": {nombre: [...]}, "resumen": [...]} o None.
-    Los precios son el cierre tal cual lo entrega Twelve Data (USD para las que
-    cotizan en EE. UU.) o ya convertido a USD para las de Yahoo. Se redondean a 2.
+    Los precios son el cierre tal cual lo da Twelve Data (USD para las gringas) o
+    ya pasado a USD para las de Yahoo. Redondeo a 2.
     """
     cols = {}
     grupo_de = {}
@@ -673,22 +676,22 @@ def _exportar_precios_acereras(grupos):
                         "valor": round(ult, 2), "cambio": cambio,
                         "fecha": fecha_ult})
 
-    # Mundial primero, luego EE. UU., y dentro de cada grupo alfabético.
+    # Mundial primero, luego EE. UU., y dentro de cada grupo en orden alfabético.
     resumen.sort(key=lambda x: (x["grupo"] != "Mundial", x["nombre"]))
     return {"fecha": fechas, "series": series, "resumen": resumen}
 
 
 def construir_acereras():
     """
-    Descarga las acereras de cada grupo, arma dos índices base 100 y calcula
-    su correlación (global y móvil a 90 días). Devuelve (df, info).
+    Bajo las acereras de cada grupo, armo los dos índices base 100 y saco su
+    correlación (global y móvil a 90 días). Devuelve (df, info).
 
-    El grupo "mundial" mezcla dos fuentes: Twelve Data (ADRs listados en EE. UU.)
-    y Yahoo (China e India, que el plan gratis de Twelve Data no sirve).
+    El grupo "mundial" me mezcla dos fuentes: Twelve Data (los ADRs gringos) y
+    Yahoo (China e India, que el plan gratis de Twelve Data no me da).
     """
     if not TWELVEDATA_API_KEY:
-        log("  Aviso: falta TWELVEDATA_API_KEY; las acereras vía Twelve Data se "
-            "omiten, pero las de Yahoo (China, India) sí entran.")
+        log("  Aviso: falta TWELVEDATA_API_KEY; las acereras de Twelve Data se "
+            "me caen, pero las de Yahoo (China, India) sí entran.")
 
     def jalar(dic, etiqueta):
         precios, ok, fallaron = {}, [], []
@@ -702,7 +705,7 @@ def construir_acereras():
             else:
                 precios[tk] = s
                 ok.append(nom)
-            time.sleep(8.0)   # plan gratis: máx. 8 peticiones/min -> 1 cada 8 s
+            time.sleep(8.0)   # plan gratis: máx 8 peticiones/min -> 1 cada 8 s y no me banean
         return precios, ok, fallaron
 
     def jalar_yahoo(dic, etiqueta="mundial"):
@@ -716,14 +719,14 @@ def construir_acereras():
             else:
                 precios[tk] = s
                 ok.append(nom)
-            time.sleep(1.5)   # Yahoo no tiene el límite estricto de Twelve Data
+            time.sleep(1.5)   # Yahoo no me aprieta como Twelve Data, con esto basta
         return precios, ok, fallaron, nombres
 
     p_m, ok_m, fail_m       = jalar(ACERERAS_MUNDIAL, "mundial")   # Twelve Data (ADRs)
     p_y, ok_y, fail_y, nm_y = jalar_yahoo(ACERERAS_YAHOO)          # Yahoo (China, India)
     p_u, ok_u, fail_u       = jalar(ACERERAS_EEUU, "EE.UU.")       # Twelve Data
 
-    # mezcla Twelve Data + Yahoo en un solo grupo "mundial"
+    # junto Twelve Data + Yahoo en un solo grupo "mundial"
     NOMBRES_MUNDIAL = {**ACERERAS_MUNDIAL, **nm_y}
     p_m    = {**p_m, **p_y}
     ok_m   = ok_m + ok_y
@@ -739,28 +742,27 @@ def construir_acereras():
     df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u}, axis=1)
     df = df.sort_index()
     df = df[df.index >= FECHA_INICIO].dropna(how="all")
-    # rebasar ambos a 100 en su primera fecha común para comparar en la gráfica
+    # rebaso ambos a 100 en su primera fecha común para poder compararlos en la gráfica
     df = df.dropna()
     for c in df.columns:
         df[c] = df[c] / df[c].iloc[0] * 100.0
 
-    # Correlación sobre rendimientos SEMANALES (cierre de viernes). La semana
-    # da tiempo a que todas las bolsas (Asia, Europa, EE. UU.) reflejen lo mismo,
-    # así que elimina el desfase de husos horarios que ensucia la versión diaria.
+    # Correlación sobre rendimientos SEMANALES (cierre de viernes). Le doy semana
+    # para que todas las bolsas (Asia, Europa, EE. UU.) reflejen lo mismo y así
+    # me quito el desfase de husos horarios que ensucia la versión diaria.
     sem = df.resample("W-FRI").last()
     rmw = sem["Índice mundial"].pct_change()
     ruw = sem["Índice EE. UU."].pct_change()
     corr_global = float(rmw.corr(ruw))
     corr_movil = rmw.rolling(13).corr(ruw)            # ~1 trimestre (13 semanas)
-
     corr_fecha = [d.strftime("%Y-%m-%d") for d in sem.index]
     corr_series = [None if pd.isna(v) else round(float(v), 3) for v in corr_movil]
 
     df = df.reset_index().rename(columns={"index": "fecha"})
-    if "fecha" not in df.columns:        # por si el índice no se llamaba 'fecha'
+    if "fecha" not in df.columns:        # por si el índice no se llamó 'fecha'
         df = df.rename(columns={df.columns[0]: "fecha"})
 
-    # Precios individuales por acción (tarjetas + gráfica con selector, estilo divisas).
+    # Precios individuales por acción (tarjetas + gráfica con selector, igual que las divisas).
     precios_export = _exportar_precios_acereras(
         [(NOMBRES_MUNDIAL, p_m), (ACERERAS_EEUU, p_u)])
 
@@ -772,7 +774,7 @@ def construir_acereras():
 
 
 def construir_diario():
-    """Une todas las series diarias en una sola tabla por fecha."""
+    """Junto todas las series diarias en una sola tabla por fecha."""
     log("Descargando Henry Hub (EIA)...")
     diario = obtener_henry_hub()
 
@@ -788,7 +790,7 @@ def construir_diario():
     diario = diario[diario["fecha"] >= FECHA_INICIO].sort_values("fecha")
     diario = diario.reset_index(drop=True)
 
-    # quitar picos falsos de la fuente en precios de energía
+    # le quito los picos falsos de la fuente a los precios de energía
     for col in RANGOS_VALIDOS:
         diario = sanear(diario, col)
 
@@ -796,10 +798,10 @@ def construir_diario():
 
 
 # ------------------------------------------------------------------
-# 2) Escritura del Excel con formato
+# 2) El Excel con formato bonito
 # ------------------------------------------------------------------
-# Paleta (misma del panel web: carbón, naranja, rojo, dorado, franja cálida)
-AZUL   = "EA580C"   # fila de encabezados (naranja)
+# Paleta (la misma del panel: carbón, naranja, rojo, dorado, franja cálida)
+AZUL   = "EA580C"   # fila de encabezados (naranja) — el nombre quedó de antes, ya sé
 AZUL2  = "26262B"   # barra de título (carbón)
 ORO    = "FFC400"   # texto de títulos / acentos (dorado)
 GRIS   = "FDF1E7"   # franjas alternas (cálido claro)
@@ -808,7 +810,7 @@ borde_fino = Border(*(Side(style="thin", color="EADFD3"),) * 4)
 
 
 def _formatos_diario():
-    """Mapa nombre_de_columna -> formato numérico para la hoja Diario."""
+    """Mapa nombre_de_columna -> formato numérico, para la hoja Diario."""
     fmt = {COL_HH: FMT_HH}
     fmt.update({n: f for (n, f) in FRED_DIARIAS.values()})
     fmt.update({n: f for (n, f) in _fx_columns()})
@@ -824,7 +826,8 @@ def _series_resumen():
 
 
 def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
-    """Vuelca un DataFrame con encabezado, franjas, filtros y formato."""
+    """Vuelco un DataFrame con encabezado, franjas, filtros y formato. Aquí está
+    todo el rollo cosmético del Excel."""
     cols = list(df.columns)
     n_col = len(cols)
 
@@ -836,7 +839,7 @@ def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 26
 
-    # ---- subtítulo con fecha de generación (fila 2) ----
+    # ---- subtítulo con la fecha de generación (fila 2) ----
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_col)
     c = ws.cell(row=2, column=1,
                 value=f"Generado: {dt.datetime.now():%Y-%m-%d %H:%M}  ·  "
@@ -882,14 +885,14 @@ def _estilizar_hoja(ws, df, formatos, titulo, col_fecha="fecha"):
         else:
             ws.column_dimensions[letra].width = max(13, min(len(nombre) + 2, 20))
 
-    # ---- congelar encabezado + primera columna, y autofiltro ----
+    # ---- congelo encabezado + primera columna, y pongo autofiltro ----
     ws.freeze_panes = ws.cell(row=fila_enc + 1, column=2)
     ultima = get_column_letter(n_col)
     ws.auto_filter.ref = f"A{fila_enc}:{ultima}{fila_enc + len(df)}"
 
 
 def _hoja_resumen(ws, diario, infl):
-    """Hoja de portada con los últimos valores de cada serie."""
+    """La hoja de portada con el último valor de cada serie."""
     ws.sheet_view.showGridLines = False
     ws.merge_cells("A1:C1")
     c = ws.cell(row=1, column=1, value="Resumen de mercados")
@@ -934,7 +937,7 @@ def _hoja_resumen(ws, diario, infl):
         v3.alignment = Alignment(horizontal="center")
         r += 1
 
-    # macro mensual/trimestral
+    # macro mensual/trimestral (esto va aparte porque no es diario)
     macro = infl
     filas_macro = [
         ("Inflación YoY (CPI)", "Inflacion YoY", "0.0%"),
@@ -969,7 +972,7 @@ def _hoja_resumen(ws, diario, infl):
 
 
 def _grafico_excel(ws, fila_enc, n_filas, col_idx, titulo, ancla):
-    """Inserta un mini gráfico de línea nativo de Excel en la hoja Diario."""
+    """Mete un mini gráfico de línea nativo de Excel en la hoja Diario."""
     ch = LineChart()
     ch.title = titulo
     ch.height = 7
@@ -985,7 +988,7 @@ def _grafico_excel(ws, fila_enc, n_filas, col_idx, titulo, ancla):
 
 
 def _hoja_graficos_fx(wb, ws_diario, diario):
-    """Hoja con una gráfica de línea nativa por divisa (unidades por 1 USD)."""
+    """Una hoja con una gráfica de línea nativa por cada divisa (unidades por 1 USD)."""
     ws = wb.create_sheet("Gráficos FX")
     ws.sheet_view.showGridLines = False
     ws.merge_cells("A1:R1")
@@ -995,11 +998,11 @@ def _hoja_graficos_fx(wb, ws_diario, diario):
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 26
 
-    fila_enc = 3                         # fila de encabezados en la hoja Diario
+    fila_enc = 3                         # la fila de encabezados en la hoja Diario
     n = len(diario)
     cols = list(diario.columns)
-    anclas_col = ["A", "J"]              # dos columnas de gráficas
-    paso_fila = 14                       # filas entre una gráfica y la de abajo
+    anclas_col = ["A", "J"]              # dos columnas de gráficas, lado a lado
+    paso_fila = 14                       # cuántas filas dejo entre una gráfica y la de abajo
     idx = 0
     for iso, (label, _fmt) in MONEDAS.items():
         if label not in cols:
@@ -1035,7 +1038,7 @@ def escribir_excel(diario, infl, ruta, acereras=None):
     _estilizar_hoja(ws_dia, diario, _formatos_diario(),
                     "Series diarias  ·  Henry Hub, S&P 500, WTI, Brent y divisas")
 
-    # gráficos nativos para Henry Hub y S&P 500
+    # gráficos nativos de Henry Hub y S&P 500
     fila_enc = 3
     n = len(diario)
     cols = list(diario.columns)
@@ -1054,7 +1057,7 @@ def escribir_excel(diario, infl, ruta, acereras=None):
                      "Desempleo": '0.0"%"', "PIB crec.": '0.0"%"'},
                     "Macro EE. UU.  ·  inflación, desempleo y PIB")
 
-    # Hoja 4: Acereras (índices; la correlación semanal va en el panel web)
+    # Hoja 4: Acereras (los índices; la correlación semanal la dejo en el panel)
     if acereras is not None and not acereras.empty:
         ws_ac = wb.create_sheet("Acereras")
         _estilizar_hoja(ws_ac, acereras,
@@ -1068,7 +1071,7 @@ def escribir_excel(diario, infl, ruta, acereras=None):
 
 
 # ------------------------------------------------------------------
-# 3) Gráficos PNG (panel resumen)
+# 3) Los PNG (panel resumen con matplotlib)
 # ------------------------------------------------------------------
 def crear_graficos(diario, macro, ruta_png):
     fig, ax = plt.subplots(3, 2, figsize=(13, 12))
@@ -1114,7 +1117,7 @@ def crear_graficos(diario, macro, ruta_png):
 
 
 def crear_graficos_fx(diario, ruta_png):
-    """Panel con una gráfica por divisa (unidades por 1 USD)."""
+    """Un panel con una gráfica por divisa (unidades por 1 USD)."""
     monedas = [label for (label, _f) in MONEDAS.values() if label in diario.columns]
     if not monedas:
         return
@@ -1130,7 +1133,7 @@ def crear_graficos_fx(diario, ruta_png):
         a.set_title(label, fontsize=10)
         a.grid(True, alpha=0.3)
         a.tick_params(labelsize=8)
-    for j in range(len(monedas), len(ejes)):     # apaga ejes sobrantes
+    for j in range(len(monedas), len(ejes)):     # apago los ejes que me sobran
         ejes[j].axis("off")
     fig.text(0.99, 0.01,
              f"Fuente: Frankfurter (tipos de referencia del Banco Central Europeo).  "
@@ -1142,11 +1145,11 @@ def crear_graficos_fx(diario, ruta_png):
 
 
 # ------------------------------------------------------------------
-# 3b) Exportar datos a JSON (para el panel web / GitHub Pages)
+# 3b) Exportar a JSON (esto es lo que lee el panel / GitHub Pages)
 # ------------------------------------------------------------------
 def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
                   construccion=None, chatarra=None):
-    """Vuelca los datos en un JSON compacto que consume el index.html."""
+    """Tira todo a un JSON compacto que es lo que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
         for v in serie:
@@ -1166,7 +1169,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
         resumen.append({"serie": nombre, "valor": round(float(ult[nombre]), 6),
                         "fecha": ult["fecha"].strftime("%Y-%m-%d"), "fmt": fmt})
 
-    # indicadores macro (mensuales/trimestrales). 'escala' lleva el valor a %.
+    # indicadores macro (mensuales/trimestrales). 'escala' me lleva el valor a %.
     macro_def = [
         ("Inflación YoY (CPI)",        "Inflacion YoY", 100),
         ("Desempleo",                  "Desempleo",       1),
@@ -1186,7 +1189,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
         })
 
     # indicadores de construcción (niveles mensuales). Cada uno trae su unidad y
-    # formato para que el panel lo muestre tal cual (no son porcentajes).
+    # formato para que el panel lo muestre tal cual (estos NO son porcentajes).
     construccion_def = [
         # (nombre, columna, unidad, decimales, prefijo, sufijo)
         ("Housing Starts",        "Housing Starts",
@@ -1210,8 +1213,8 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             })
 
     # chatarra ferrosa (índices de precio mensuales del PPI). El nivel es un
-    # índice base 1982=100 (no $/ton): la tarjeta resalta el % mensual, que sí
-    # es la lectura útil del mercado.
+    # índice base 1982=100 (no $/ton): por eso la tarjeta resalta el % mensual,
+    # que es la lectura útil del mercado.
     chatarra_out = []
     if chatarra is not None and not chatarra.empty:
         for col in chatarra.columns:
@@ -1265,7 +1268,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
 
 
 # ------------------------------------------------------------------
-# 4) Programa principal
+# 4) El programa principal
 # ------------------------------------------------------------------
 def main():
     if not EIA_API_KEY or not FRED_API_KEY:
@@ -1314,7 +1317,7 @@ def main():
         crear_graficos_fx(diario, png_fx_fecha)
         crear_graficos_fx(diario, png_fx_recie)
 
-        # datos para el panel web (GitHub Pages)
+        # los datos para el panel (GitHub Pages)
         escribir_json(diario, macro, CARPETA / "datos.json",
                       acereras=acereras, info_acereras=info_ac,
                       construccion=construccion, chatarra=chatarra)
