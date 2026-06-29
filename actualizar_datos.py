@@ -462,6 +462,126 @@ def obtener_chatarra():
 
 
 # ------------------------------------------------------------------
+# 1c) Top 10 países productores de acero (worldsteel)
+# ------------------------------------------------------------------
+# worldsteel no tiene API pública, así que esto raspa el HTML de sus press
+# releases mensuales. La Tabla 2 ("Top 10 steel-producing countries") siempre
+# trae la misma estructura, así que es estable. Si un día cambian el formato,
+# revisar _parsear_top10(). Si todo falla devuelve None y la sección se omite,
+# igual que chatarra/construcción.
+_WS_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+_WS_MESES = {"january": 1, "february": 2, "march": 3, "april": 4, "may": 5,
+             "june": 6, "july": 7, "august": 8, "september": 9, "october": 10,
+             "november": 11, "december": 12}
+
+
+def _ws_get(url, intentos=4, espera_base=2):
+    """GET con backoff exponencial (2,4,8,16s), mismo espíritu que obtener_fx."""
+    import time as _t
+    ultimo = None
+    for i in range(intentos):
+        try:
+            r = requests.get(url, headers=_WS_HEADERS, timeout=30)
+            r.raise_for_status()
+            return r.text
+        except requests.RequestException as e:
+            ultimo = e
+            espera = espera_base * (2 ** i)
+            log(f"  worldsteel intento {i+1}/{intentos} falló ({e}); reintento en {espera}s")
+            _t.sleep(espera)
+    log(f"  worldsteel se rindió tras {intentos} intentos: {ultimo}")
+    return None
+
+
+def _ws_ultimo_comunicado(html):
+    """Del índice del año saca la URL del comunicado de producción más reciente.
+    Ordeno por la fecha del dato (mes-año del slug), no por el orden del HTML."""
+    import re
+    patron = re.compile(r"press-releases/(\d{4})/([a-z]+)-(\d{4})-crude-steel-production[^\"']*")
+    enc = {}
+    for m in re.finditer(patron, html):
+        mes_txt, anio = m.group(2), int(m.group(3))
+        if mes_txt not in _WS_MESES:
+            continue
+        url = "https://worldsteel.org/media/" + m.group(0)
+        if not url.endswith("/"):
+            url += "/"
+        enc[(anio, _WS_MESES[mes_txt])] = url
+    if not enc:
+        return None, None
+    clave = max(enc)
+    return enc[clave], clave
+
+
+def _ws_parsear_top10(html):
+    """Saca la Tabla 2 (Top 10). Es la primera tabla con China en la 1a columna
+    (la de regiones empieza con Africa)."""
+    import re
+    from io import StringIO
+    try:
+        tablas = pd.read_html(StringIO(html))
+    except ValueError:
+        log("  worldsteel: no encontré tablas en el comunicado")
+        return None
+    for t in tablas:
+        col0 = t.iloc[:, 0].astype(str)
+        if not col0.str.contains("China", case=False).any():
+            continue
+        t = t.head(10)
+        paises = []
+        for _, fila in t.iterrows():
+            try:
+                pais = re.sub(r"\s*\(e\)", "", str(fila.iloc[0])).strip()  # quito el (e) de estimado
+                paises.append({
+                    "pais": pais,
+                    "mes_mt": float(fila.iloc[1]),
+                    "var_mes_pct": float(fila.iloc[2]),
+                    "ytd_mt": float(str(fila.iloc[3]).replace(",", "")),  # 1,324.5 -> 1324.5
+                    "var_ytd_pct": float(fila.iloc[4]),
+                })
+            except (ValueError, IndexError):
+                continue
+        return paises or None
+    log("  worldsteel: ninguna tabla con China; quizá cambió el formato")
+    return None
+
+
+def obtener_productores():
+    """Top 10 países productores de acero (worldsteel). Devuelve un dict listo
+    para datos.json, o None si no se pudo (para no tumbar la corrida)."""
+    anio = dt.date.today().year
+    url_pr, clave = None, None
+    # busco en el año actual; si en enero aún no hay comunicado, voy al previo
+    for a in (anio, anio - 1):
+        idx = _ws_get(f"https://worldsteel.org/media/press-releases/{a}/")
+        if not idx:
+            continue
+        url_pr, clave = _ws_ultimo_comunicado(idx)
+        if url_pr:
+            break
+    if not url_pr:
+        log("  worldsteel: no encontré ningún comunicado de producción")
+        return None
+    html_pr = _ws_get(url_pr)
+    if not html_pr:
+        return None
+    top10 = _ws_parsear_top10(html_pr)
+    if not top10:
+        return None
+    anio_d, mes_d = clave
+    log(f"Productores: worldsteel {anio_d}-{mes_d:02d}, {len(top10)} países")
+    return {
+        "periodo": f"{anio_d}-{mes_d:02d}",
+        "fuente_url": url_pr,
+        "paises": top10,
+    }
+
+
+# ------------------------------------------------------------------
 # 1b) Acereras: precios de acciones (Twelve Data + Yahoo) -> índices y correlación
 # ------------------------------------------------------------------
 def obtener_twelvedata(symbol, reintentos=4):
@@ -1148,7 +1268,7 @@ def crear_graficos_fx(diario, ruta_png):
 # 3b) Exportar a JSON (esto es lo que lee el panel / GitHub Pages)
 # ------------------------------------------------------------------
 def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
-                  construccion=None, chatarra=None):
+                  construccion=None, chatarra=None, productores=None):
     """Tira todo a un JSON compacto que es lo que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -1263,6 +1383,10 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             "precios": ia.get("precios"),
         }
 
+    # Top 10 productores de acero (worldsteel). Es un ranking chico, lo meto tal cual.
+    if productores:
+        obj["productores"] = productores
+
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
 
@@ -1303,6 +1427,13 @@ def main():
             log(f"  Aviso: la sección de acereras falló y se omite: {e}")
             acereras, info_ac = None, None
 
+        log("Descargando Top 10 productores de acero (worldsteel)...")
+        try:
+            productores = obtener_productores()
+        except Exception as e:
+            log(f"  Aviso: la sección de productores falló y se omite: {e}")
+            productores = None
+
         xlsx_fecha = CARPETA / f"mercados_{HOY}.xlsx"
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
         png_fecha = CARPETA / f"graficos_{HOY}.png"
@@ -1320,7 +1451,8 @@ def main():
         # los datos para el panel (GitHub Pages)
         escribir_json(diario, macro, CARPETA / "datos.json",
                       acereras=acereras, info_acereras=info_ac,
-                      construccion=construccion, chatarra=chatarra)
+                      construccion=construccion, chatarra=chatarra,
+                      productores=productores)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
