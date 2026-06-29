@@ -652,6 +652,7 @@ function construirProductores(){
   const spanP = document.getElementById("prod-periodo");
   if(spanP){
     spanP.innerHTML = "· "+periodoTxt+
+      (pr.respaldo ? " <span style='color:var(--gris);'>(respaldo)</span>" : "")+
       (pr.fuente_url ? "  ·  <a href='"+pr.fuente_url+"' target='_blank' rel='noopener' style='color:var(--gold);'>fuente</a>" : "");
   }
   // tarjetas: los 3 primeros por acumulado (YTD)
