@@ -569,35 +569,117 @@ def _ws_parsear_top10(html):
     return None
 
 
+# Respaldo embebido. Si worldsteel bloquea al runner (como me pasó con Stooq),
+# uso este snapshot real para que la pestaña nunca quede vacía. Se refresca solo
+# en cuanto el scraping vuelva a funcionar. Para actualizarlo a mano: copio el
+# Top 10 del comunicado más reciente de https://worldsteel.org/media/press-releases/
+_WS_FALLBACK = {
+    "periodo": "2026-05",
+    "fuente_url": "https://worldsteel.org/media/press-releases/2026/may-2026-crude-steel-production/",
+    "respaldo": True,   # bandera: este dato vino del snapshot, no de la corrida en vivo
+    "paises": [
+        {"pais": "China",         "mes_mt": 84.4, "var_mes_pct": -2.7, "ytd_mt": 415.5, "var_ytd_pct": -3.9},
+        {"pais": "India",         "mes_mt": 14.1, "var_mes_pct":  1.9, "ytd_mt":  72.9, "var_ytd_pct":  7.8},
+        {"pais": "United States", "mes_mt":  7.5, "var_mes_pct":  9.2, "ytd_mt":  35.6, "var_ytd_pct":  6.8},
+        {"pais": "Japan",         "mes_mt":  7.0, "var_mes_pct":  1.7, "ytd_mt":  33.6, "var_ytd_pct": -0.7},
+        {"pais": "South Korea",   "mes_mt":  5.4, "var_mes_pct":  3.3, "ytd_mt":  26.4, "var_ytd_pct":  2.7},
+        {"pais": "Russia",        "mes_mt":  5.6, "var_mes_pct": -5.4, "ytd_mt":  26.4, "var_ytd_pct": -10.0},
+        {"pais": "Türkiye",       "mes_mt":  3.4, "var_mes_pct":  8.9, "ytd_mt":  16.5, "var_ytd_pct":  6.8},
+        {"pais": "Germany",       "mes_mt":  3.2, "var_mes_pct":  7.3, "ytd_mt":  15.7, "var_ytd_pct":  8.8},
+        {"pais": "Brazil",        "mes_mt":  2.8, "var_mes_pct":  2.4, "ytd_mt":  13.4, "var_ytd_pct": -1.9},
+        {"pais": "Viet Nam",      "mes_mt":  2.6, "var_mes_pct": 27.2, "ytd_mt":  12.6, "var_ytd_pct": 26.8},
+    ],
+}
+
+
+def _ws_meses_recientes(n=6):
+    """Devuelve los últimos n (año, mes) de datos, del más reciente al más viejo.
+    El comunicado de un mes sale ~3-4 semanas después, así que arranco en el mes
+    pasado respecto a hoy."""
+    hoy = dt.date.today()
+    y, m = hoy.year, hoy.month
+    salida = []
+    for _ in range(n):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        salida.append((y, m))
+    return salida
+
+
+def _ws_url_directa(anio_dato, mes_dato):
+    """Construyo la URL del comunicado mensual directo, sin pasar por el índice.
+    El año de la ruta es el de PUBLICACIÓN (el mes siguiente), que para ene-nov es
+    el mismo año del dato y para diciembre es el año siguiente."""
+    nombres = {1: "january", 2: "february", 3: "march", 4: "april", 5: "may",
+               6: "june", 7: "july", 8: "august", 9: "september", 10: "october",
+               11: "november", 12: "december"}
+    anio_pub = anio_dato if mes_dato != 12 else anio_dato + 1
+    return (f"https://worldsteel.org/media/press-releases/{anio_pub}/"
+            f"{nombres[mes_dato]}-{anio_dato}-crude-steel-production/")
+
+
+def _ws_valido(top10):
+    """Sanity check: que sea una lista decente con China adentro."""
+    return bool(top10) and len(top10) >= 8 and any(
+        "china" in p["pais"].lower() for p in top10)
+
+
+def _ws_diagnostico(html, url):
+    """Cuando bajé algo pero no salió la tabla, dejo pistas en la bitácora para
+    saber si fue bloqueo de IP (muro de Cloudflare/consentimiento) o cambio de
+    formato. Esto es lo que me va a decir la causa real."""
+    h = (html or "").lower()
+    n_tablas = h.count("<table")
+    marcas = [m for m in ("just a moment", "cloudflare", "captcha", "access denied",
+                          "are you human", "enable javascript", "cookie")
+              if m in h]
+    log(f"  worldsteel DIAG [{url}]: {len(html or '')} chars, "
+        f"{n_tablas} <table>, China={'sí' if 'china' in h else 'NO'}, "
+        f"sospechas={marcas or 'ninguna'}")
+
+
 def obtener_productores():
-    """Top 10 países productores de acero (worldsteel). Devuelve un dict listo
-    para datos.json, o None si no se pudo (para no tumbar la corrida)."""
+    """Top 10 países productores de acero (worldsteel). Intenta URL directa,
+    luego el índice; si worldsteel bloquea al runner, cae al respaldo embebido.
+    Nunca devuelve None: la pestaña siempre muestra algo."""
+    # 1) Intento directo: construyo la URL de los últimos meses y pruebo una por una
+    for (y, m) in _ws_meses_recientes(6):
+        url = _ws_url_directa(y, m)
+        html = _ws_get(url, intentos=2)        # pocos reintentos: si 404 paso al siguiente
+        if not html:
+            continue
+        top = _ws_parsear_top10(html)
+        if _ws_valido(top):
+            log(f"Productores: worldsteel {y}-{m:02d}, {len(top)} países (URL directa)")
+            return {"periodo": f"{y}-{m:02d}", "fuente_url": url, "paises": top}
+        # bajé algo pero no sirvió: dejo diagnóstico solo del primer intento (el mes más reciente)
+        if (y, m) == _ws_meses_recientes(1)[0]:
+            _ws_diagnostico(html, url)
+
+    # 2) Respaldo: índice del año, por si cambió el patrón de URL
     anio = dt.date.today().year
-    url_pr, clave = None, None
-    # busco en el año actual; si en enero aún no hay comunicado, voy al previo
     for a in (anio, anio - 1):
         idx = _ws_get(f"https://worldsteel.org/media/press-releases/{a}/")
         if not idx:
             continue
         url_pr, clave = _ws_ultimo_comunicado(idx)
-        if url_pr:
-            break
-    if not url_pr:
-        log("  worldsteel: no encontré ningún comunicado de producción")
-        return None
-    html_pr = _ws_get(url_pr)
-    if not html_pr:
-        return None
-    top10 = _ws_parsear_top10(html_pr)
-    if not top10:
-        return None
-    anio_d, mes_d = clave
-    log(f"Productores: worldsteel {anio_d}-{mes_d:02d}, {len(top10)} países")
-    return {
-        "periodo": f"{anio_d}-{mes_d:02d}",
-        "fuente_url": url_pr,
-        "paises": top10,
-    }
+        if not url_pr:
+            continue
+        html_pr = _ws_get(url_pr)
+        if not html_pr:
+            continue
+        top = _ws_parsear_top10(html_pr)
+        if _ws_valido(top):
+            ad, md = clave
+            log(f"Productores: worldsteel {ad}-{md:02d}, {len(top)} países (índice)")
+            return {"periodo": f"{ad}-{md:02d}", "fuente_url": url_pr, "paises": top}
+
+    # 3) Nada jaló (probable bloqueo de IP): uso el respaldo embebido para no dejar vacío
+    log(f"  worldsteel no accesible desde el runner; uso respaldo embebido "
+        f"({_WS_FALLBACK['periodo']}). Revisa el DIAG de arriba para la causa.")
+    return _WS_FALLBACK
 
 
 # ------------------------------------------------------------------
