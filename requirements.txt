@@ -4,3 +4,4 @@ matplotlib
 openpyxl
 python-dotenv
 yfinance
+lxml
