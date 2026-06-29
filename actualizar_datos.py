@@ -518,33 +518,52 @@ def _ws_ultimo_comunicado(html):
 
 
 def _ws_parsear_top10(html):
-    """Saca la Tabla 2 (Top 10). Es la primera tabla con China en la 1a columna
-    (la de regiones empieza con Africa)."""
+    """Saca la Tabla 2 (Top 10). La identifico porque alguna fila arranca con
+    China (la tabla de regiones empieza con Africa). Parseo con lxml directo,
+    SIN pandas.read_html, porque read_html se cae a html5lib cuando lxml tropieza
+    y ese paquete no está en el runner. Con lxml.html (libxml2) basta y sobra."""
     import re
-    from io import StringIO
+    from lxml import html as lh
+
+    def _num(txt):
+        # normalizo el número: quito separadores de miles (coma o espacio),
+        # el espacio duro (nbsp) y el menos "bonito" Unicode que a veces usan
+        t = (txt.replace(",", "").replace("\u00a0", "").replace(" ", "")
+                .replace("\u2212", "-"))
+        return float(t)
+
     try:
-        tablas = pd.read_html(StringIO(html))
-    except ValueError:
-        log("  worldsteel: no encontré tablas en el comunicado")
+        doc = lh.fromstring(html)
+    except Exception as e:
+        log(f"  worldsteel: no pude parsear el HTML ({e})")
         return None
-    for t in tablas:
-        col0 = t.iloc[:, 0].astype(str)
-        if not col0.str.contains("China", case=False).any():
+
+    for tabla in doc.xpath("//table"):
+        filas = []
+        for tr in tabla.xpath(".//tr"):
+            celdas = [c.text_content().strip() for c in tr.xpath("./td | ./th")]
+            if celdas:
+                filas.append(celdas)
+        # ¿es la del Top 10? alguna fila debe arrancar con China
+        if not any(len(r) >= 5 and "china" in r[0].lower() for r in filas):
             continue
-        t = t.head(10)
         paises = []
-        for _, fila in t.iterrows():
-            try:
-                pais = re.sub(r"\s*\(e\)", "", str(fila.iloc[0])).strip()  # quito el (e) de estimado
-                paises.append({
-                    "pais": pais,
-                    "mes_mt": float(fila.iloc[1]),
-                    "var_mes_pct": float(fila.iloc[2]),
-                    "ytd_mt": float(str(fila.iloc[3]).replace(",", "")),  # 1,324.5 -> 1324.5
-                    "var_ytd_pct": float(fila.iloc[4]),
-                })
-            except (ValueError, IndexError):
+        for r in filas:
+            if len(r) < 5:
                 continue
+            try:
+                fila = {
+                    "pais": re.sub(r"\s*\(e\)", "", r[0]).strip(),  # quito el (e) de estimado
+                    "mes_mt": _num(r[1]),
+                    "var_mes_pct": _num(r[2]),
+                    "ytd_mt": _num(r[3]),
+                    "var_ytd_pct": _num(r[4]),
+                }
+            except ValueError:
+                continue  # encabezado u otra fila no numérica, la salto
+            paises.append(fila)
+            if len(paises) >= 10:
+                break
         return paises or None
     log("  worldsteel: ninguna tabla con China; quizá cambió el formato")
     return None
