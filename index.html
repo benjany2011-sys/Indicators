@@ -195,7 +195,7 @@
 
     <div class="seccion-titulo">Evolución y correlación</div>
     <div class="grid-graf">
-      <div class="panel ancho"><h3>Índices equal-weight (base 100 = 2021)</h3><div class="lienzo alto"><canvas id="c-ac-idx"></canvas></div></div>
+      <div class="panel ancho"><h3>Índices de acereras — desempeño relativo (base 100 = 2021)</h3><div class="lienzo alto"><canvas id="c-ac-idx"></canvas></div></div>
       <div class="panel ancho"><h3>Correlación móvil 13 semanas (rendimientos semanales)</h3><div class="lienzo"><canvas id="c-ac-corr"></canvas></div></div>
     </div>
     <div id="ac-cobertura" class="cobertura"></div>
@@ -661,11 +661,16 @@ function tarjetaPrecio(p){
 function graficarAcereras(){
   const a = DATA.acereras;
   if(!a) return;
-  lineChart("c-ac-idx", a.fecha, [
+  const idxDatasets = [
     {data:a.mundial, borderColor:"#FFC400", label:"Mundial"},
-    {data:a.eeuu,    borderColor:"#B8BCC0", label:"EE. UU."},
-    {data:a.global,  borderColor:"#3b82f6", label:"Global (mezcla)"}
-  ], {plugins:{legend:{display:true, labels:{boxWidth:12, font:{size:11}, color:"#cfcfcf"}}}});
+    {data:a.eeuu,    borderColor:"#B8BCC0", label:"EE. UU."}
+  ];
+  if(Array.isArray(a.indice_real) && a.indice_real.some(v=>v!=null)){
+    idxDatasets.push({data:a.indice_real, borderColor:"#3b82f6",
+                      label:(a.indice_real_nombre||"NYSE Arca Steel Index")});
+  }
+  lineChart("c-ac-idx", a.fecha, idxDatasets,
+    {plugins:{legend:{display:true, labels:{boxWidth:12, font:{size:11}, color:"#cfcfcf"}}}});
   lineChart("c-ac-corr", a.corr_fecha, [{data:a.corr, borderColor:"#FF7A18"}], {
     plugins:{ legend:{display:false},
       tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? c.parsed.y.toFixed(2):"—") } } },
