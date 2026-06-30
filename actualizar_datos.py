@@ -570,14 +570,13 @@ def _ws_parsear_top10(html):
 
 
 # Respaldo embebido. Si worldsteel bloquea al runner (como me pasó con Stooq),
-# uso este snapshot real para que la pestaña nunca quede vacía. Se refresca solo
-# en cuanto el scraping vuelva a funcionar. Para actualizarlo a mano: copio el
-# Top 10 del comunicado más reciente de https://worldsteel.org/media/press-releases/
-_WS_FALLBACK = {
-    "periodo": "2026-05",
-    "fuente_url": "https://worldsteel.org/media/press-releases/2026/may-2026-crude-steel-production/",
-    "respaldo": True,   # bandera: este dato vino del snapshot, no de la corrida en vivo
-    "paises": [
+# uso estos snapshots reales para que la pestaña nunca quede vacía. Se refrescan
+# solos en cuanto el scraping vuelva a funcionar. Para actualizar a mano: copio
+# la Tabla 2 del comunicado de cada mes en https://worldsteel.org/media/press-releases/
+_WS_FALLBACK_MESES = [
+    {"periodo": "2026-05",
+     "fuente_url": "https://worldsteel.org/media/press-releases/2026/may-2026-crude-steel-production/",
+     "paises": [
         {"pais": "China",         "mes_mt": 84.4, "var_mes_pct": -2.7, "ytd_mt": 415.5, "var_ytd_pct": -3.9},
         {"pais": "India",         "mes_mt": 14.1, "var_mes_pct":  1.9, "ytd_mt":  72.9, "var_ytd_pct":  7.8},
         {"pais": "United States", "mes_mt":  7.5, "var_mes_pct":  9.2, "ytd_mt":  35.6, "var_ytd_pct":  6.8},
@@ -588,7 +587,28 @@ _WS_FALLBACK = {
         {"pais": "Germany",       "mes_mt":  3.2, "var_mes_pct":  7.3, "ytd_mt":  15.7, "var_ytd_pct":  8.8},
         {"pais": "Brazil",        "mes_mt":  2.8, "var_mes_pct":  2.4, "ytd_mt":  13.4, "var_ytd_pct": -1.9},
         {"pais": "Viet Nam",      "mes_mt":  2.6, "var_mes_pct": 27.2, "ytd_mt":  12.6, "var_ytd_pct": 26.8},
-    ],
+     ]},
+    {"periodo": "2026-04",
+     "fuente_url": "https://worldsteel.org/media/press-releases/2026/april-2026-crude-steel-production/",
+     "paises": [
+        {"pais": "China",         "mes_mt": 83.6, "var_mes_pct": -2.8, "ytd_mt": 331.1, "var_ytd_pct": -4.1},
+        {"pais": "India",         "mes_mt": 13.8, "var_mes_pct":  3.9, "ytd_mt":  58.7, "var_ytd_pct":  9.4},
+        {"pais": "United States", "mes_mt":  7.2, "var_mes_pct":  9.4, "ytd_mt":  28.1, "var_ytd_pct":  6.6},
+        {"pais": "Japan",         "mes_mt":  6.6, "var_mes_pct":  0.3, "ytd_mt":  26.7, "var_ytd_pct": -1.2},
+        {"pais": "South Korea",   "mes_mt":  5.2, "var_mes_pct":  4.8, "ytd_mt":  21.0, "var_ytd_pct":  2.5},
+        {"pais": "Russia",        "mes_mt":  5.0, "var_mes_pct": -12.4, "ytd_mt": 20.6, "var_ytd_pct": -12.0},
+        {"pais": "Türkiye",       "mes_mt":  3.3, "var_mes_pct":  9.4, "ytd_mt":  13.0, "var_ytd_pct":  6.3},
+        {"pais": "Germany",       "mes_mt":  3.2, "var_mes_pct":  9.5, "ytd_mt":  12.5, "var_ytd_pct":  9.1},
+        {"pais": "Brazil",        "mes_mt":  2.7, "var_mes_pct":  2.8, "ytd_mt":  10.8, "var_ytd_pct": -1.6},
+        {"pais": "Viet Nam",      "mes_mt":  2.1, "var_mes_pct":  4.0, "ytd_mt":   8.5, "var_ytd_pct":  8.4},
+     ]},
+]
+_WS_FALLBACK = {
+    "periodo": _WS_FALLBACK_MESES[0]["periodo"],
+    "fuente_url": _WS_FALLBACK_MESES[0]["fuente_url"],
+    "respaldo": True,   # bandera: este dato vino del snapshot, no de la corrida en vivo
+    "paises": _WS_FALLBACK_MESES[0]["paises"],
+    "meses": _WS_FALLBACK_MESES,
 }
 
 
@@ -640,45 +660,58 @@ def _ws_diagnostico(html, url):
         f"sospechas={marcas or 'ninguna'}")
 
 
-def obtener_productores():
-    """Top 10 países productores de acero (worldsteel). Intenta URL directa,
-    luego el índice; si worldsteel bloquea al runner, cae al respaldo embebido.
-    Nunca devuelve None: la pestaña siempre muestra algo."""
-    # 1) Intento directo: construyo la URL de los últimos meses y pruebo una por una
-    for (y, m) in _ws_meses_recientes(6):
+def obtener_productores(n_meses=8):
+    """Top 10 países productores de acero (worldsteel), de los últimos n_meses.
+    Intenta URL directa mes por mes; si worldsteel bloquea al runner, cae al
+    respaldo embebido. Nunca devuelve None: la pestaña siempre muestra algo.
+
+    Estructura: {periodo, fuente_url, paises (mes más reciente), meses:[...]}.
+    'meses' va del más reciente al más viejo; cada uno trae su propio Top 10."""
+    meses = []
+    primero = True
+    for (y, m) in _ws_meses_recientes(n_meses):
         url = _ws_url_directa(y, m)
         html = _ws_get(url, intentos=2)        # pocos reintentos: si 404 paso al siguiente
-        if not html:
-            continue
-        top = _ws_parsear_top10(html)
-        if _ws_valido(top):
-            log(f"Productores: worldsteel {y}-{m:02d}, {len(top)} países (URL directa)")
-            return {"periodo": f"{y}-{m:02d}", "fuente_url": url, "paises": top}
-        # bajé algo pero no sirvió: dejo diagnóstico solo del primer intento (el mes más reciente)
-        if (y, m) == _ws_meses_recientes(1)[0]:
-            _ws_diagnostico(html, url)
+        if html:
+            top = _ws_parsear_top10(html)
+            if _ws_valido(top):
+                meses.append({"periodo": f"{y}-{m:02d}", "fuente_url": url, "paises": top})
+            elif primero:
+                # bajé algo pero no sirvió en el mes más reciente: dejo diagnóstico
+                _ws_diagnostico(html, url)
+        primero = False
 
-    # 2) Respaldo: índice del año, por si cambió el patrón de URL
-    anio = dt.date.today().year
-    for a in (anio, anio - 1):
-        idx = _ws_get(f"https://worldsteel.org/media/press-releases/{a}/")
-        if not idx:
-            continue
-        url_pr, clave = _ws_ultimo_comunicado(idx)
-        if not url_pr:
-            continue
-        html_pr = _ws_get(url_pr)
-        if not html_pr:
-            continue
-        top = _ws_parsear_top10(html_pr)
-        if _ws_valido(top):
-            ad, md = clave
-            log(f"Productores: worldsteel {ad}-{md:02d}, {len(top)} países (índice)")
-            return {"periodo": f"{ad}-{md:02d}", "fuente_url": url_pr, "paises": top}
+    # respaldo por índice si la URL directa no trajo nada (por si cambió el patrón)
+    if not meses:
+        anio = dt.date.today().year
+        for a in (anio, anio - 1):
+            idx = _ws_get(f"https://worldsteel.org/media/press-releases/{a}/")
+            if not idx:
+                continue
+            url_pr, clave = _ws_ultimo_comunicado(idx)
+            if not url_pr:
+                continue
+            html_pr = _ws_get(url_pr)
+            top = _ws_parsear_top10(html_pr) if html_pr else None
+            if _ws_valido(top):
+                ad, md = clave
+                meses.append({"periodo": f"{ad}-{md:02d}", "fuente_url": url_pr, "paises": top})
+            break
 
-    # 3) Nada jaló (probable bloqueo de IP): uso el respaldo embebido para no dejar vacío
+    if meses:
+        log(f"Productores: worldsteel, {len(meses)} mes(es) "
+            f"({meses[-1]['periodo']} a {meses[0]['periodo']})")
+        reciente = meses[0]
+        return {
+            "periodo": reciente["periodo"],
+            "fuente_url": reciente["fuente_url"],
+            "paises": reciente["paises"],
+            "meses": meses,
+        }
+
+    # nada jaló (probable bloqueo de IP): respaldo embebido para no dejar vacío
     log(f"  worldsteel no accesible desde el runner; uso respaldo embebido "
-        f"({_WS_FALLBACK['periodo']}). Revisa el DIAG de arriba para la causa.")
+        f"({len(_WS_FALLBACK['meses'])} meses). Revisa el DIAG de arriba para la causa.")
     return _WS_FALLBACK
 
 
