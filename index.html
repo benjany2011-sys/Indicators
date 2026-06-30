@@ -198,6 +198,11 @@
       <div class="panel ancho"><h3>Índices equal-weight (base 100 = 2021)</h3><div class="lienzo alto"><canvas id="c-ac-idx"></canvas></div></div>
       <div class="panel ancho"><h3>Correlación móvil 13 semanas (rendimientos semanales)</h3><div class="lienzo"><canvas id="c-ac-corr"></canvas></div></div>
     </div>
+
+    <div class="seccion-titulo">VanEck Steel ETF (SLX) <span id="slx-sub" style="color:var(--gris); font-weight:400;"></span></div>
+    <div class="grid-graf">
+      <div class="panel ancho"><h3>SLX — precio de cierre (USD)</h3><div class="lienzo alto"><canvas id="c-ac-slx"></canvas></div></div>
+    </div>
     <div id="ac-cobertura" class="cobertura"></div>
   </section>
 
@@ -691,6 +696,24 @@ function graficarAcereras(){
       ch.data.datasets[0].label = sel.value;
       ch.update();
     });
+  }
+
+  // VanEck Steel ETF (SLX): su propia gráfica, aparte de los índices.
+  const slx = a.slx;
+  const sub = document.getElementById("slx-sub");
+  if(slx && Array.isArray(slx.precio) && slx.precio.length){
+    const vals = slx.precio.filter(v=>v!=null);
+    if(sub && vals.length){
+      const ult = vals[vals.length-1];
+      const fUlt = slx.fecha[slx.fecha.length-1] || "";
+      sub.textContent = "· último $"+ult.toFixed(2)+" ("+fUlt+")";
+    }
+    lineChart("c-ac-slx", slx.fecha, [{data:slx.precio, borderColor:"#37d67a", label:"SLX"}], {
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? "$"+c.parsed.y.toFixed(2):"—") } } }
+    });
+  } else if(sub){
+    sub.textContent = "· sin datos en esta corrida";
   }
 }
 
