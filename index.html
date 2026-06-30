@@ -638,6 +638,18 @@ function graficarAcereras(){
 let _prodMetrica = "ytd";   // "ytd" o "mes"
 let _prodMesIdx = 0;        // índice dentro de meses[] (0 = más reciente)
 
+// nombres de país en español (worldsteel los manda en inglés). Si alguno no está
+// en el mapa, se queda como viene, así nunca aparece vacío.
+const _PROD_ES = {
+  "China":"China", "India":"India", "United States":"Estados Unidos",
+  "Japan":"Japón", "South Korea":"Corea del Sur", "Russia":"Rusia",
+  "Türkiye":"Turquía", "Turkey":"Turquía", "Germany":"Alemania",
+  "Brazil":"Brasil", "Viet Nam":"Vietnam", "Vietnam":"Vietnam", "Iran":"Irán",
+  "Italy":"Italia", "Taiwan (China)":"Taiwán", "Taiwan, China":"Taiwán",
+  "Ukraine":"Ucrania", "Mexico":"México", "Spain":"España", "France":"Francia",
+};
+function _prodNombreES(p){ return _PROD_ES[p] || p; }
+
 function _prodPeriodoBonito(p){
   if(!p) return "";
   const meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio",
@@ -714,7 +726,7 @@ function _prodActualizar(){
   [...snap.paises].sort((a,b)=>b.ytd_mt-a.ytd_mt).slice(0,3).forEach((p,k)=>{
     const card=document.createElement("div"); card.className="card";
     card.innerHTML =
-      "<div class='nombre'>#"+(k+1)+" "+p.pais+"</div>"+
+      "<div class='nombre'>#"+(k+1)+" "+_prodNombreES(p.pais)+"</div>"+
       "<div class='valor'>"+p.ytd_mt.toLocaleString("es-MX")+" Mt</div>"+
       "<div class='delta-linea'>"+htmlDelta({pp:false, val:p.var_ytd_pct})+"</div>"+
       "<div class='interp'>acumulado del año</div>"+
@@ -733,7 +745,7 @@ function graficarProductores(){
   const campoVar = esYTD ? "var_ytd_pct" : "var_mes_pct";
 
   const filas = [...snap.paises].sort((a,b)=> b[campoMt]-a[campoMt]);
-  const labels  = filas.map(p=>p.pais);
+  const labels  = filas.map(p=>_prodNombreES(p.pais));
   const valores = filas.map(p=>p[campoMt]);
   const cambios = filas.map(p=>p[campoVar]);
   const colores = cambios.map(v=> v>=0 ? "#37d67a" : "#ff5b5b");
