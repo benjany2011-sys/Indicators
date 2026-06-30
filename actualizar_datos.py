@@ -162,7 +162,6 @@ ACERERAS_EEUU = {
     "WOR":   "Worthington",
     "ATI":   "ATI",
     "CRS":   "Carpenter Technology",
-    "ZEUS":  "Olympic Steel",
     # "X":   "U.S. Steel",  # la deslistaron el 18-jun-2025 (la compró Nippon); ya no cotiza
 }
 
@@ -185,6 +184,15 @@ ACERERAS_YAHOO = {
     "JSWSTEEL.NS":   ("JSW Steel",    "INR"),
     "SAIL.NS":       ("SAIL",         "INR"),
     "JINDALSTEL.NS": ("Jindal Steel", "INR"),
+}
+
+# Small-caps de EE.UU. que el plan GRATIS de Twelve Data NO da (responde 404:
+# "este símbolo es del plan Grow/Venture"). Las jalo por Yahoo, que sí las cubre
+# gratis. Cotizan en USD, así que obtener_yahoo no hace conversión. Importante:
+# estas se suman al grupo EE.UU. (no al mundial), que es donde corresponden.
+ACERERAS_EEUU_YAHOO = {
+    "ZEUS": ("Olympic Steel",      "USD"),
+    "IIIN": ("Insteel Industries", "USD"),
 }
 
 # El país de cada acerera, para etiquetar las tarjetas y el selector del panel
@@ -219,6 +227,7 @@ PAIS_ACERERA = {
     "ATI":                  "EE. UU.",
     "Carpenter Technology": "EE. UU.",
     "Olympic Steel":        "EE. UU.",
+    "Insteel Industries":   "EE. UU.",
 }
 
 # A cada divisa le agrego también la columna inversa "USD por <ISO>"
@@ -978,7 +987,13 @@ def construir_acereras():
 
     p_m, ok_m, fail_m       = jalar(ACERERAS_MUNDIAL, "mundial")   # Twelve Data (ADRs)
     p_y, ok_y, fail_y, nm_y = jalar_yahoo(ACERERAS_YAHOO)          # Yahoo (China, India)
-    p_u, ok_u, fail_u       = jalar(ACERERAS_EEUU, "EE.UU.")       # Twelve Data
+    p_u, ok_u, fail_u       = jalar(ACERERAS_EEUU, "EE.UU.")       # Twelve Data (large caps)
+    # small-caps de EE.UU. por Yahoo (Twelve Data no las da gratis): MISMO grupo EE.UU.
+    p_uy, ok_uy, fail_uy, nm_uy = jalar_yahoo(ACERERAS_EEUU_YAHOO, "EE.UU.")
+    p_u    = {**p_u, **p_uy}
+    ok_u   = ok_u + ok_uy
+    fail_u = fail_u + fail_uy
+    NOMBRES_EEUU = {**ACERERAS_EEUU, **nm_uy}   # para el export de precios
 
     # junto Twelve Data + Yahoo en un solo grupo "mundial"
     NOMBRES_MUNDIAL = {**ACERERAS_MUNDIAL, **nm_y}
@@ -1018,7 +1033,7 @@ def construir_acereras():
 
     # Precios individuales por acción (tarjetas + gráfica con selector, igual que las divisas).
     precios_export = _exportar_precios_acereras(
-        [(NOMBRES_MUNDIAL, p_m), (ACERERAS_EEUU, p_u)])
+        [(NOMBRES_MUNDIAL, p_m), (NOMBRES_EEUU, p_u)])
 
     info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
             "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
