@@ -1005,12 +1005,14 @@ def construir_acereras():
 
     idx_m = _indice_grupo(p_m)
     idx_u = _indice_grupo(p_u)
+    idx_g = _indice_grupo({**p_m, **p_u})   # índice global: todas las acereras juntas (mundial + EE. UU.)
     if idx_m is None or idx_u is None:
         log("  Aviso: faltan datos de acereras en algún grupo; se omite la sección.")
         return None, {"corr_global": None, "ok_mundial": ok_m, "ok_eeuu": ok_u,
                       "fallaron": fail_m + fail_u}
 
-    df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u}, axis=1)
+    df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u,
+                    "Índice global": idx_g}, axis=1)
     df = df.sort_index()
     df = df[df.index >= FECHA_INICIO].dropna(how="all")
     # rebaso ambos a 100 en su primera fecha común para poder compararlos en la gráfica
@@ -1040,22 +1042,6 @@ def construir_acereras():
     info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
             "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
             "fallaron": fail_m + fail_u, "precios": precios_export}
-
-    # VanEck Steel ETF (SLX): lo jalo por Yahoo (USD) pero lo dejo APARTE, fuera de
-    # los índices y del export de precios. Va en su propia gráfica en el front.
-    log("Descargando VanEck Steel ETF (SLX) [aparte/Yahoo USD]...")
-    slx = obtener_yahoo("SLX", moneda="USD")
-    if slx is not None and not getattr(slx, "empty", True):
-        s2 = slx[slx.index >= pd.Timestamp(FECHA_INICIO)]
-        info["slx"] = {
-            "nombre": "VanEck Steel ETF (SLX)",
-            "fecha":  [d.strftime("%Y-%m-%d") for d in s2.index],
-            "precio": [None if pd.isna(v) else round(float(v), 2) for v in s2.values],
-        }
-        log(f"  SLX: {len(s2)} cierres, último ${float(s2.dropna().iloc[-1]):.2f}")
-    else:
-        log("  SLX: vino vacío; se omite esta corrida")
-
     log(f"Correlación semanal acereras mundial vs. EE. UU. (desde {FECHA_INICIO}): {corr_global:.2f}")
     return df, info
 
@@ -1541,6 +1527,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             "fecha": acereras["fecha"].dt.strftime("%Y-%m-%d").tolist(),
             "mundial": limpia(acereras["Índice mundial"], 2),
             "eeuu": limpia(acereras["Índice EE. UU."], 2),
+            "global": limpia(acereras["Índice global"], 2),
             "corr_fecha": ia.get("corr_fecha", []),
             "corr": ia.get("corr_series", []),
             "corr_global": (None if cg is None else round(cg, 3)),
@@ -1548,7 +1535,6 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             "ok_eeuu": ia.get("ok_eeuu", []),
             "fallaron": ia.get("fallaron", []),
             "precios": ia.get("precios"),
-            "slx": ia.get("slx"),
         }
 
     # Top 10 productores de acero (worldsteel). Es un ranking chico, lo meto tal cual.
