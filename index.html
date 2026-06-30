@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de mercados</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- zoom/pan en las gráficas (rueda = zoom, arrastrar = caja de zoom, ctrl+arrastrar = mover, doble clic = reset) -->
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <style>
   :root{
     --gold:#FFC400; --naranja:#FF7A18; --rojo:#E62315; --plata:#B8BCC0;
@@ -362,10 +365,30 @@ function interpretaFX(serie, c){
   return capitaliza(nombre)+(fuerte ? " se fortaleció" : " se debilitó");
 }
 
+// registro el plugin de zoom (si el <script> lo auto-registró, no lo duplico)
+(function(){
+  try{
+    let ya=false;
+    try{ ya = !!Chart.registry.plugins.get("zoom"); }catch(_){ ya=false; }
+    if(!ya && window.ChartZoom) Chart.register(window.ChartZoom);
+  }catch(e){}
+})();
+
+// rueda = zoom; arrastrar = caja de zoom; ctrl+arrastrar = mover; doble clic = reset
+const ZOOM_OPTS = {
+  zoom:{
+    wheel:{enabled:true},
+    pinch:{enabled:true},
+    drag:{enabled:true, backgroundColor:"rgba(255,157,46,.15)", borderColor:"#FF9D2E", borderWidth:1},
+    mode:"xy"
+  },
+  pan:{ enabled:true, mode:"xy", modifierKey:"ctrl" }
+};
+
 const BASE_OPTS = {
   responsive:true, maintainAspectRatio:false,
   interaction:{mode:"index", intersect:false},
-  plugins:{ legend:{display:false, labels:{color:"#cfcfcf"}}, tooltip:{callbacks:{}} },
+  plugins:{ legend:{display:false, labels:{color:"#cfcfcf"}}, tooltip:{callbacks:{}}, zoom:ZOOM_OPTS },
   elements:{ point:{radius:0}, line:{borderWidth:1.8, tension:.12} },
   scales:{
     x:{ ticks:{maxTicksLimit:8, font:{size:11}, color:"#9aa0a6"}, grid:{display:false}, border:{color:"#3a3a42"} },
@@ -390,10 +413,15 @@ function lineChart(id, labels, datasets, opts){
   options.scales.x.afterBuildTicks = (axis)=>{
     const n = axis.chart.data.labels.length;
     if(n <= 1) return;
-    const max = 8, paso = (n - 1) / (max - 1), idx = [];
-    for(let i=0;i<max;i++) idx.push(Math.round(i*paso));
+    // si hay zoom, reparto las ~8 etiquetas dentro del rango visible
+    let lo = 0, hi = n - 1;
+    if(typeof axis.min === "number") lo = Math.ceil(axis.min);
+    if(typeof axis.max === "number") hi = Math.floor(axis.max);
+    if(hi <= lo){ axis.ticks = [{value:Math.max(0,Math.min(lo,n-1))}]; return; }
+    const max = 8, paso = (hi - lo) / (max - 1), idx = [];
+    for(let i=0;i<max;i++) idx.push(Math.round(lo + i*paso));
     const uniq = [...new Set(idx)].sort((a,b)=>a-b);
-    if(uniq[uniq.length-1] !== n-1) uniq.push(n-1);
+    if(uniq[uniq.length-1] !== hi) uniq.push(hi);
     axis.ticks = uniq.map(v=>({value:v}));
   };
   const c = new Chart(document.getElementById(id), {
@@ -401,6 +429,7 @@ function lineChart(id, labels, datasets, opts){
     data:{ labels, datasets:datasets.map(d=>Object.assign({spanGaps:true}, d)) },
     options
   });
+  c.canvas.addEventListener("dblclick", ()=>{ try{ c.resetZoom(); }catch(e){} });  // doble clic = reset zoom
   charts[id]=c; return c;
 }
 
@@ -410,10 +439,15 @@ function ultimosDosMacro(valores){
   return r;
 }
 
+// busca el índice de un indicador macro por palabra clave en el nombre
+function _macroIdx(kw){ return (DATA.macro||[]).findIndex(x=>(x.nombre||"").toLowerCase().includes(kw)); }
+
 function construirMacro(){
   const cont=document.getElementById("cards-macro");
   const graf=document.getElementById("graf-macro");
-  (DATA.macro||[]).forEach((ind, k)=>{
+  const macro = DATA.macro||[];
+  // tarjetas: una por indicador, como siempre
+  macro.forEach((ind)=>{
     const v = ultimosDosMacro(ind.valores);
     const ultVal = v.length ? v[0]*ind.escala : null;
     let delta=null;
@@ -426,6 +460,16 @@ function construirMacro(){
       "<div class='delta-linea'>"+htmlDelta(delta)+"</div>"+
       "<div class='fecha'>"+ultFecha+"</div>";
     cont.appendChild(card);
+  });
+  // paneles: inflación + desempleo en UNA gráfica; el resto cada uno por su lado
+  const iInfl=_macroIdx("inflaci"), iDes=_macroIdx("desemple");
+  if(iInfl>=0 && iDes>=0){
+    const panel=document.createElement("div"); panel.className="panel ancho";
+    panel.innerHTML="<h3>Inflación vs. Desempleo (%)</h3><div class='lienzo'><canvas id='c-macro-combo'></canvas></div>";
+    graf.appendChild(panel);
+  }
+  macro.forEach((ind,k)=>{
+    if(k===iInfl || k===iDes) return;   // esos dos ya van juntos arriba
     const panel=document.createElement("div"); panel.className="panel ancho";
     panel.innerHTML="<h3>"+ind.nombre+" (%)</h3><div class='lienzo'><canvas id='c-macro-"+k+"'></canvas></div>";
     graf.appendChild(panel);
@@ -433,7 +477,22 @@ function construirMacro(){
 }
 
 function graficarMacro(){
-  (DATA.macro||[]).forEach((ind, k)=>{
+  const macro = DATA.macro||[];
+  const iInfl=_macroIdx("inflaci"), iDes=_macroIdx("desemple");
+  if(iInfl>=0 && iDes>=0){
+    const inf=macro[iInfl], des=macro[iDes];
+    const vInf=inf.valores.map(x=> x===null?null:x*inf.escala);
+    const vDes=des.valores.map(x=> x===null?null:x*des.escala);
+    lineChart("c-macro-combo", inf.fecha, [
+      {label:inf.nombre, data:vInf, borderColor:"#FF9D2E"},
+      {label:des.nombre, data:vDes, borderColor:"#3b82f6"}
+    ], {
+      plugins:{ legend:{display:true, labels:{boxWidth:12, font:{size:11}, color:"#cfcfcf"}},
+        tooltip:{ callbacks:{ label:c=> c.dataset.label+": "+(c.parsed.y!=null? c.parsed.y.toFixed(1)+"%":"—") } } }
+    });
+  }
+  macro.forEach((ind,k)=>{
+    if(k===iInfl || k===iDes) return;
     const vals = ind.valores.map(x=> x===null?null:x*ind.escala);
     lineChart("c-macro-"+k, ind.fecha, [{data:vals, borderColor:"#FF9D2E"}], {
       plugins:{ legend:{display:false},
