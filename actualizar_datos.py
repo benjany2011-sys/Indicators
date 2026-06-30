@@ -191,8 +191,9 @@ ACERERAS_YAHOO = {
 # gratis. Cotizan en USD, así que obtener_yahoo no hace conversión. Importante:
 # estas se suman al grupo EE.UU. (no al mundial), que es donde corresponden.
 ACERERAS_EEUU_YAHOO = {
-    "ZEUS": ("Olympic Steel",      "USD"),
-    "IIIN": ("Insteel Industries", "USD"),
+    "MTUS": ("Metallus",            "USD"),  # acero especial (ex-TimkenSteel)
+    "IIIN": ("Insteel Industries",  "USD"),
+    "FRD":  ("Friedman Industries", "USD"),  # NYSE American
 }
 
 # El país de cada acerera, para etiquetar las tarjetas y el selector del panel
@@ -226,8 +227,9 @@ PAIS_ACERERA = {
     "Worthington":          "EE. UU.",
     "ATI":                  "EE. UU.",
     "Carpenter Technology": "EE. UU.",
-    "Olympic Steel":        "EE. UU.",
     "Insteel Industries":   "EE. UU.",
+    "Metallus":             "EE. UU.",
+    "Friedman Industries":  "EE. UU.",
 }
 
 # A cada divisa le agrego también la columna inversa "USD por <ISO>"
@@ -1038,6 +1040,22 @@ def construir_acereras():
     info = {"corr_global": corr_global, "corr_fecha": corr_fecha,
             "corr_series": corr_series, "ok_mundial": ok_m, "ok_eeuu": ok_u,
             "fallaron": fail_m + fail_u, "precios": precios_export}
+
+    # VanEck Steel ETF (SLX): lo jalo por Yahoo (USD) pero lo dejo APARTE, fuera de
+    # los índices y del export de precios. Va en su propia gráfica en el front.
+    log("Descargando VanEck Steel ETF (SLX) [aparte/Yahoo USD]...")
+    slx = obtener_yahoo("SLX", moneda="USD")
+    if slx is not None and not getattr(slx, "empty", True):
+        s2 = slx[slx.index >= pd.Timestamp(FECHA_INICIO)]
+        info["slx"] = {
+            "nombre": "VanEck Steel ETF (SLX)",
+            "fecha":  [d.strftime("%Y-%m-%d") for d in s2.index],
+            "precio": [None if pd.isna(v) else round(float(v), 2) for v in s2.values],
+        }
+        log(f"  SLX: {len(s2)} cierres, último ${float(s2.dropna().iloc[-1]):.2f}")
+    else:
+        log("  SLX: vino vacío; se omite esta corrida")
+
     log(f"Correlación semanal acereras mundial vs. EE. UU. (desde {FECHA_INICIO}): {corr_global:.2f}")
     return df, info
 
@@ -1530,6 +1548,7 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             "ok_eeuu": ia.get("ok_eeuu", []),
             "fallaron": ia.get("fallaron", []),
             "precios": ia.get("precios"),
+            "slx": ia.get("slx"),
         }
 
     # Top 10 productores de acero (worldsteel). Es un ranking chico, lo meto tal cual.
