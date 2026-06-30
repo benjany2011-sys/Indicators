@@ -76,6 +76,8 @@
   .prod-btn{border:0; padding:6px 14px; font-size:13px; cursor:pointer;
     background:transparent; color:var(--tinta); font-family:inherit;}
   .prod-btn.activo{background:var(--naranja); color:#1f1f23; font-weight:700;}
+  .prod-sel{background:var(--tarjeta2); color:var(--tinta); border:1px solid var(--linea);
+    border-radius:8px; padding:6px 10px; font-size:13px; font-family:inherit; cursor:pointer;}
 
   .grid-graf{display:grid; gap:16px; grid-template-columns:repeat(2,1fr);}
   @media(max-width:820px){ .grid-graf{grid-template-columns:1fr;} }
@@ -228,9 +230,12 @@
     <div class="cards" id="cards-productores"></div>
     <div class="seccion-titulo">
       Ranking <span id="prod-periodo" style="color:var(--gris); font-weight:400;"></span>
-      <span id="prod-toggle" style="float:right; display:inline-flex; border:1px solid var(--linea); border-radius:8px; overflow:hidden;">
-        <button class="prod-btn" data-metrica="ytd">YTD (acumulado)</button>
-        <button class="prod-btn" data-metrica="mes">Mes</button>
+      <span style="float:right; display:inline-flex; gap:8px; align-items:center;">
+        <select id="prod-mes" class="prod-sel"></select>
+        <span id="prod-toggle" style="display:inline-flex; border:1px solid var(--linea); border-radius:8px; overflow:hidden;">
+          <button class="prod-btn" data-metrica="ytd">YTD (acumulado)</button>
+          <button class="prod-btn" data-metrica="mes">Mes</button>
+        </span>
       </span>
     </div>
     <div class="panel ancho"><div class="lienzo alto"><canvas id="c-productores"></canvas></div></div>
@@ -631,6 +636,7 @@ function graficarAcereras(){
 }
 
 let _prodMetrica = "ytd";   // "ytd" o "mes"
+let _prodMesIdx = 0;        // índice dentro de meses[] (0 = más reciente)
 
 function _prodPeriodoBonito(p){
   if(!p) return "";
@@ -640,24 +646,72 @@ function _prodPeriodoBonito(p){
   return (meses[i]||p)+" "+a;
 }
 
+// lista de meses disponibles; si el JSON es viejo (sin 'meses') armo uno solo
+function _prodMesesArr(){
+  const pr = DATA.productores;
+  if(!pr) return [];
+  if(Array.isArray(pr.meses) && pr.meses.length) return pr.meses;
+  if(Array.isArray(pr.paises) && pr.paises.length)
+    return [{periodo:pr.periodo, fuente_url:pr.fuente_url, paises:pr.paises}];
+  return [];
+}
+function _prodSnap(){
+  const arr=_prodMesesArr();
+  return arr[Math.min(_prodMesIdx, arr.length-1)] || null;
+}
+
 function construirProductores(){
   const pr = DATA.productores;
   const cont = document.getElementById("cards-productores");
-  if(!pr || !Array.isArray(pr.paises) || !pr.paises.length){
+  const arr = _prodMesesArr();
+  if(!arr.length){
     if(cont) cont.innerHTML="<div class='card'><div class='nombre'>Productores</div>"+
       "<div class='interp'>Sin datos en esta corrida.</div></div>";
     return;
   }
-  const periodoTxt = _prodPeriodoBonito(pr.periodo);
+  // lleno el selector de mes (más reciente primero)
+  const sel = document.getElementById("prod-mes");
+  if(sel){
+    sel.innerHTML = "";
+    arr.forEach((mm, i)=>{
+      const o=document.createElement("option");
+      o.value=i; o.textContent=_prodPeriodoBonito(mm.periodo);
+      sel.appendChild(o);
+    });
+    sel.value = 0;
+    sel.style.display = arr.length>1 ? "" : "none";   // si solo hay un mes, lo escondo
+    sel.addEventListener("change", ()=>{ _prodMesIdx = parseInt(sel.value,10)||0; _prodActualizar(); });
+  }
+  // toggle YTD/Mes
+  document.querySelectorAll(".prod-btn").forEach(btn=>{
+    btn.classList.toggle("activo", btn.dataset.metrica===_prodMetrica);
+    btn.addEventListener("click", ()=>{
+      _prodMetrica = btn.dataset.metrica;
+      document.querySelectorAll(".prod-btn").forEach(b=> b.classList.toggle("activo", b===btn));
+      _prodActualizar();
+    });
+  });
+  _prodActualizar();
+}
+
+// repinta subtítulo + tarjetas + gráfica según el mes y la métrica activos
+function _prodActualizar(){
+  const pr = DATA.productores;
+  const snap = _prodSnap();
+  if(!snap) return;
+  const periodoTxt = _prodPeriodoBonito(snap.periodo);
+
   const spanP = document.getElementById("prod-periodo");
   if(spanP){
     spanP.innerHTML = "· "+periodoTxt+
-      (pr.respaldo ? " <span style='color:var(--gris);'>(respaldo)</span>" : "")+
-      (pr.fuente_url ? "  ·  <a href='"+pr.fuente_url+"' target='_blank' rel='noopener' style='color:var(--gold);'>fuente</a>" : "");
+      (pr && pr.respaldo ? " <span style='color:var(--gris);'>(respaldo)</span>" : "")+
+      (snap.fuente_url ? "  ·  <a href='"+snap.fuente_url+"' target='_blank' rel='noopener' style='color:var(--gold);'>fuente</a>" : "");
   }
-  // tarjetas: los 3 primeros por acumulado (YTD)
-  const top3 = [...pr.paises].sort((a,b)=>b.ytd_mt-a.ytd_mt).slice(0,3);
-  top3.forEach((p,k)=>{
+
+  // tarjetas: top 3 por acumulado del mes seleccionado
+  const cont = document.getElementById("cards-productores");
+  cont.innerHTML = "";
+  [...snap.paises].sort((a,b)=>b.ytd_mt-a.ytd_mt).slice(0,3).forEach((p,k)=>{
     const card=document.createElement("div"); card.className="card";
     card.innerHTML =
       "<div class='nombre'>#"+(k+1)+" "+p.pais+"</div>"+
@@ -667,25 +721,18 @@ function construirProductores(){
       "<div class='fecha'>"+periodoTxt+"</div>";
     cont.appendChild(card);
   });
-  // cableo el toggle (una sola vez)
-  document.querySelectorAll(".prod-btn").forEach(btn=>{
-    btn.classList.toggle("activo", btn.dataset.metrica===_prodMetrica);
-    btn.addEventListener("click", ()=>{
-      _prodMetrica = btn.dataset.metrica;
-      document.querySelectorAll(".prod-btn").forEach(b=> b.classList.toggle("activo", b===btn));
-      graficarProductores();
-    });
-  });
+
+  graficarProductores();
 }
 
 function graficarProductores(){
-  const pr = DATA.productores;
-  if(!pr || !Array.isArray(pr.paises) || !pr.paises.length) return;
+  const snap = _prodSnap();
+  if(!snap || !Array.isArray(snap.paises) || !snap.paises.length) return;
   const esYTD = _prodMetrica==="ytd";
   const campoMt  = esYTD ? "ytd_mt"      : "mes_mt";
   const campoVar = esYTD ? "var_ytd_pct" : "var_mes_pct";
 
-  const filas = [...pr.paises].sort((a,b)=> b[campoMt]-a[campoMt]);
+  const filas = [...snap.paises].sort((a,b)=> b[campoMt]-a[campoMt]);
   const labels  = filas.map(p=>p.pais);
   const valores = filas.map(p=>p[campoMt]);
   const cambios = filas.map(p=>p[campoVar]);
