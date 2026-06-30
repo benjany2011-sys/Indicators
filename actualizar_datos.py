@@ -1005,14 +1005,12 @@ def construir_acereras():
 
     idx_m = _indice_grupo(p_m)
     idx_u = _indice_grupo(p_u)
-    idx_g = _indice_grupo({**p_m, **p_u})   # índice global: todas las acereras juntas (mundial + EE. UU.)
     if idx_m is None or idx_u is None:
         log("  Aviso: faltan datos de acereras en algún grupo; se omite la sección.")
         return None, {"corr_global": None, "ok_mundial": ok_m, "ok_eeuu": ok_u,
                       "fallaron": fail_m + fail_u}
 
-    df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u,
-                    "Índice global": idx_g}, axis=1)
+    df = pd.concat({"Índice mundial": idx_m, "Índice EE. UU.": idx_u}, axis=1)
     df = df.sort_index()
     df = df[df.index >= FECHA_INICIO].dropna(how="all")
     # rebaso ambos a 100 en su primera fecha común para poder compararlos en la gráfica
@@ -1030,6 +1028,25 @@ def construir_acereras():
     corr_movil = rmw.rolling(13).corr(ruw)            # ~1 trimestre (13 semanas)
     corr_fecha = [d.strftime("%Y-%m-%d") for d in sem.index]
     corr_series = [None if pd.isna(v) else round(float(v), 3) for v in corr_movil]
+
+    # Índice REAL publicado: NYSE Arca Steel Index (^STEEL), el benchmark que sigue
+    # el ETF SLX (ponderado por capitalización, ~24 acereras globales). Lo jalo por
+    # Yahoo y lo agrego como tercera línea, alineado a las fechas del df y rebasado a
+    # 100. Si Yahoo no lo da, simplemente no sale esa línea (no afecta mundial/EE. UU.
+    # ni la correlación, que se calcula solo entre esos dos).
+    NOMBRE_INDICE_REAL = "NYSE Arca Steel Index"
+    log("Descargando NYSE Arca Steel Index (^STEEL) [Yahoo]...")
+    steel = obtener_yahoo("^STEEL", moneda="USD")
+    if steel is not None and not getattr(steel, "empty", True):
+        s = steel.reindex(df.index).astype(float)
+        valida = s.dropna()
+        if len(valida) > 1:
+            df[NOMBRE_INDICE_REAL] = s / valida.iloc[0] * 100.0
+            log(f"  ^STEEL: {len(valida)} cierres OK")
+        else:
+            log("  ^STEEL: sin datos en el rango; se omite la línea")
+    else:
+        log("  ^STEEL: vino vacío; se omite la línea")
 
     df = df.reset_index().rename(columns={"index": "fecha"})
     if "fecha" not in df.columns:        # por si el índice no se llamó 'fecha'
@@ -1527,7 +1544,9 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
             "fecha": acereras["fecha"].dt.strftime("%Y-%m-%d").tolist(),
             "mundial": limpia(acereras["Índice mundial"], 2),
             "eeuu": limpia(acereras["Índice EE. UU."], 2),
-            "global": limpia(acereras["Índice global"], 2),
+            "indice_real": (limpia(acereras["NYSE Arca Steel Index"], 2)
+                            if "NYSE Arca Steel Index" in acereras.columns else None),
+            "indice_real_nombre": "NYSE Arca Steel Index",
             "corr_fecha": ia.get("corr_fecha", []),
             "corr": ia.get("corr_series", []),
             "corr_global": (None if cg is None else round(cg, 3)),
