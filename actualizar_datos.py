@@ -1029,24 +1029,33 @@ def construir_acereras():
     corr_fecha = [d.strftime("%Y-%m-%d") for d in sem.index]
     corr_series = [None if pd.isna(v) else round(float(v), 3) for v in corr_movil]
 
-    # Índice REAL publicado: NYSE Arca Steel Index (^STEEL), el benchmark que sigue
-    # el ETF SLX (ponderado por capitalización, ~24 acereras globales). Lo jalo por
-    # Yahoo y lo agrego como tercera línea, alineado a las fechas del df y rebasado a
-    # 100. Si Yahoo no lo da, simplemente no sale esa línea (no afecta mundial/EE. UU.
-    # ni la correlación, que se calcula solo entre esos dos).
-    NOMBRE_INDICE_REAL = "NYSE Arca Steel Index"
-    log("Descargando NYSE Arca Steel Index (^STEEL) [Yahoo]...")
+    # Índice REAL publicado: intento primero el NYSE Arca Steel Index (^STEEL) y,
+    # si Yahoo no lo da (pasa seguido, es un índice poco líquido), caigo a SLX
+    # (VanEck Steel ETF), que es el ETF que físicamente replica ese índice
+    # (~24 acereras globales ponderadas por capitalización) y sí trae precio
+    # diario confiable. Cualquiera de los dos se rebasa a 100 igual que mundial/
+    # EE. UU. Si ninguno responde, simplemente no sale esa línea (no afecta la
+    # correlación, que se calcula solo entre mundial y EE. UU.).
+    log("Descargando índice real de acereras [Yahoo]...")
     steel = obtener_yahoo("^STEEL", moneda="USD")
+    fuente_indice_real = "^STEEL"
+    NOMBRE_INDICE_REAL = "NYSE Arca Steel Index"
+    if steel is None or getattr(steel, "empty", True) or steel.reindex(df.index).dropna().shape[0] <= 1:
+        log("  ^STEEL: sin datos útiles; probando SLX (ETF) como respaldo...")
+        steel = obtener_yahoo("SLX", moneda="USD")
+        fuente_indice_real = "SLX"
+        NOMBRE_INDICE_REAL = "NYSE Arca Steel Index (SLX ETF)"
+
     if steel is not None and not getattr(steel, "empty", True):
         s = steel.reindex(df.index).astype(float)
         valida = s.dropna()
         if len(valida) > 1:
             df[NOMBRE_INDICE_REAL] = s / valida.iloc[0] * 100.0
-            log(f"  ^STEEL: {len(valida)} cierres OK")
+            log(f"  {fuente_indice_real}: {len(valida)} cierres OK")
         else:
-            log("  ^STEEL: sin datos en el rango; se omite la línea")
+            log(f"  {fuente_indice_real}: sin datos en el rango; se omite la línea")
     else:
-        log("  ^STEEL: vino vacío; se omite la línea")
+        log(f"  {fuente_indice_real}: vino vacío; se omite la línea")
 
     df = df.reset_index().rename(columns={"index": "fecha"})
     if "fecha" not in df.columns:        # por si el índice no se llamó 'fecha'
@@ -1540,13 +1549,19 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
     if acereras is not None and not acereras.empty:
         ia = info_acereras or {}
         cg = ia.get("corr_global")
+        # La columna del índice real puede llamarse "NYSE Arca Steel Index" (si
+        # ^STEEL sí respondió) o "NYSE Arca Steel Index (SLX ETF)" (respaldo).
+        # La detecto por descarte, ya que es la única columna extra aparte de
+        # fecha/mundial/EE. UU.
+        cols_base = {"fecha", "Índice mundial", "Índice EE. UU."}
+        col_indice_real = next((c for c in acereras.columns if c not in cols_base), None)
         obj["acereras"] = {
             "fecha": acereras["fecha"].dt.strftime("%Y-%m-%d").tolist(),
             "mundial": limpia(acereras["Índice mundial"], 2),
             "eeuu": limpia(acereras["Índice EE. UU."], 2),
-            "indice_real": (limpia(acereras["NYSE Arca Steel Index"], 2)
-                            if "NYSE Arca Steel Index" in acereras.columns else None),
-            "indice_real_nombre": "NYSE Arca Steel Index",
+            "indice_real": (limpia(acereras[col_indice_real], 2)
+                            if col_indice_real else None),
+            "indice_real_nombre": (col_indice_real or "NYSE Arca Steel Index"),
             "corr_fecha": ia.get("corr_fecha", []),
             "corr": ia.get("corr_series", []),
             "corr_global": (None if cg is None else round(cg, 3)),
