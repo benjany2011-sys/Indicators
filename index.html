@@ -139,6 +139,7 @@
   <button class="tab" data-tab="construccion">Construcción</button>
   <button class="tab" data-tab="chatarra">Chatarra</button>
   <button class="tab" data-tab="productores">Productores</button>
+  <button class="tab" data-tab="swap">Swap Gas</button>
   <button class="tab" data-tab="archivos">Archivos</button>
 </nav>
 
@@ -243,6 +244,79 @@
     </div>
     <div class="panel ancho"><div class="lienzo alto"><canvas id="c-productores"></canvas></div></div>
     <div class="cobertura" id="prod-cobertura">World Steel Association (worldsteel), comunicado mensual de producción de acero crudo. Barras en millones de toneladas (Mt); <b>verde</b> si creció y <b>rojo</b> si cayó frente al año previo. China domina por mucho (más de la mitad del total mundial), así que aplasta la escala. Mensuales, ~3-4 semanas de rezago.</div>
+  </section>
+
+  <!-- SWAP GAS -->
+  <section id="sec-swap">
+    <div class="seccion-titulo">Fair value del swap — Pro Energy</div>
+    <div class="grid-graf">
+      <div class="panel">
+        <h3>Curva forward HSC ($/MMBtu)</h3>
+        <div id="swap-months" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:6px;"></div>
+      </div>
+      <div class="panel">
+        <h3>Modelo &amp; oferta</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Hedge ratio (β)</label>
+            <input type="number" id="sw-beta" step="0.0001" value="1.0436" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Intercepto ($/MMBtu)</label>
+            <input type="number" id="sw-int" step="0.001" value="0.0525" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Volumen mensual (MMBtu)</label>
+            <input type="number" id="sw-vol" step="100" value="10000" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Margen objetivo ($/MMBtu)</label>
+            <input type="number" id="sw-margin" step="0.005" value="0.05" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Precio de swap cotizado ($/MMBtu)</label>
+          <input type="number" id="sw-price" step="0.001" value="2.879" class="prod-sel" style="width:100%;">
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Duración del strip (meses)</label>
+          <input type="number" id="sw-nmonths" min="1" max="12" value="7" class="prod-sel" style="width:100%;">
+        </div>
+      </div>
+    </div>
+
+    <div class="seccion-titulo">Resultado</div>
+    <div class="panel ancho" style="margin-bottom:16px;">
+      <div id="sw-verdict" style="font-size:16px; margin-bottom:14px;"></div>
+      <div class="cards" style="grid-template-columns:repeat(3,1fr);">
+        <div class="card"><div class="nombre">Fair value WMC ponderado</div><div class="valor" id="sw-fair">—</div></div>
+        <div class="card"><div class="nombre">Margen implícito del swap</div><div class="valor" id="sw-implied">—</div></div>
+        <div class="card"><div class="nombre">Diferencia vs. objetivo</div><div class="valor" id="sw-delta">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel ancho">
+      <h3>Detalle por mes</h3>
+      <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+        <thead>
+          <tr style="color:var(--gris); text-align:right;">
+            <th style="text-align:left; padding:6px 8px;">Mes</th>
+            <th style="padding:6px 8px;">HSC forward</th>
+            <th style="padding:6px 8px;">WMC fair value</th>
+            <th style="padding:6px 8px;">Swap cotizado</th>
+            <th style="padding:6px 8px;">Volumen</th>
+            <th style="padding:6px 8px;">Costo fair value</th>
+            <th style="padding:6px 8px;">Costo swap</th>
+          </tr>
+        </thead>
+        <tbody id="sw-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -890,8 +964,82 @@ function construirGraficas(tab){
 function mostrarTab(tab){
   document.querySelectorAll(".tab").forEach(b=> b.classList.toggle("activo", b.dataset.tab===tab));
   document.querySelectorAll("section").forEach(sec=> sec.classList.toggle("activa", sec.id==="sec-"+tab));
+  if(tab==="swap" && !construido.swap){ iniciarSwap(); construido.swap=true; }
   if(!construido[tab]){ construirGraficas(tab); construido[tab]=true; }
   else { Object.values(charts).forEach(c=> c.resize()); }
+}
+
+// ---- SWAP GAS: fair value calculator ----
+const SWAP_MESES = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar","Abr","May"];
+const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70,2.68];
+
+function iniciarSwap(){
+  const nInput = document.getElementById("sw-nmonths");
+  const rebuildMonths = ()=>{
+    const n = Math.max(1, Math.min(12, parseInt(nInput.value)||7));
+    const cont = document.getElementById("swap-months");
+    cont.innerHTML = "";
+    for(let i=0;i<n;i++){
+      const div = document.createElement("div");
+      div.innerHTML = `<label style="display:block; font-size:11px; color:var(--gris); margin-bottom:4px; text-transform:uppercase;">${SWAP_MESES[i]}</label>
+        <input type="number" step="0.001" class="sw-fwd prod-sel" style="width:100%;" value="${SWAP_FWD_DEFAULT[i]}">`;
+      cont.appendChild(div);
+    }
+    cont.querySelectorAll(".sw-fwd").forEach(el=> el.addEventListener("input", calcularSwap));
+    calcularSwap();
+  };
+  nInput.addEventListener("change", rebuildMonths);
+  ["sw-beta","sw-int","sw-vol","sw-margin","sw-price"].forEach(id=>{
+    document.getElementById(id).addEventListener("input", calcularSwap);
+  });
+  rebuildMonths();
+}
+
+function calcularSwap(){
+  const beta = parseFloat(document.getElementById("sw-beta").value)||0;
+  const intercept = parseFloat(document.getElementById("sw-int").value)||0;
+  const volume = parseFloat(document.getElementById("sw-vol").value)||0;
+  const swapPrice = parseFloat(document.getElementById("sw-price").value)||0;
+  const targetMargin = parseFloat(document.getElementById("sw-margin").value)||0;
+  const fwds = Array.from(document.querySelectorAll(".sw-fwd")).map(el=> parseFloat(el.value)||0);
+
+  let totalVol=0, totalFairCost=0, totalSwapCost=0, weightedFairSum=0, rows="";
+  fwds.forEach((hsc,i)=>{
+    const fairWMC = beta*hsc + intercept;
+    const cost = fairWMC*volume;
+    const swapCost = swapPrice*volume;
+    totalVol+=volume; totalFairCost+=cost; totalSwapCost+=swapCost; weightedFairSum+=fairWMC*volume;
+    rows += `<tr style="border-bottom:1px solid var(--linea);">
+      <td style="padding:6px 8px;">${SWAP_MESES[i]}</td>
+      <td style="padding:6px 8px; text-align:right;">$${hsc.toFixed(3)}</td>
+      <td style="padding:6px 8px; text-align:right;">$${fairWMC.toFixed(3)}</td>
+      <td style="padding:6px 8px; text-align:right;">$${swapPrice.toFixed(3)}</td>
+      <td style="padding:6px 8px; text-align:right;">${volume.toLocaleString()}</td>
+      <td style="padding:6px 8px; text-align:right;">$${cost.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+      <td style="padding:6px 8px; text-align:right;">$${swapCost.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+    </tr>`;
+  });
+  document.getElementById("sw-tbody").innerHTML = rows;
+
+  const fairAvg = totalVol>0 ? weightedFairSum/totalVol : 0;
+  const impliedMargin = swapPrice - fairAvg;
+  const marginDelta = impliedMargin - targetMargin;
+
+  document.getElementById("sw-fair").textContent = "$"+fairAvg.toFixed(3);
+  const impliedEl = document.getElementById("sw-implied");
+  impliedEl.textContent = (impliedMargin>=0?"+":"")+"$"+impliedMargin.toFixed(3);
+  impliedEl.style.color = impliedMargin>0 ? "var(--baja)" : "var(--sube)";
+
+  const deltaEl = document.getElementById("sw-delta");
+  deltaEl.textContent = (marginDelta>=0?"+":"")+"$"+marginDelta.toFixed(3);
+  deltaEl.style.color = marginDelta>0 ? "var(--baja)" : "var(--sube)";
+
+  const verdict = document.getElementById("sw-verdict");
+  if(impliedMargin <= targetMargin){
+    verdict.innerHTML = `<span style="color:var(--sube); font-weight:700;">✓ Favorable —</span> el swap cotizado a $${swapPrice.toFixed(3)} queda dentro de tu margen objetivo sobre el fair value.`;
+  } else {
+    verdict.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Revisar —</span> el swap cotizado a $${swapPrice.toFixed(3)} implica un margen de $${impliedMargin.toFixed(3)} sobre el fair value, arriba de tu objetivo de $${targetMargin.toFixed(3)}. Hay espacio para negociar.`;
+  }
 }
 
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
