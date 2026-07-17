@@ -251,7 +251,7 @@
     <div class="seccion-titulo">Fair value del swap — Pro Energy</div>
     <div class="grid-graf">
       <div class="panel">
-        <h3>Curva forward HSC ($/MMBtu)</h3>
+        <h3>Curva forward HSC ($/MMBtu) <span id="sw-fuente" style="font-size:11px; font-weight:400; color:var(--gris);"></span></h3>
         <div id="swap-months" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:6px;"></div>
       </div>
       <div class="panel">
@@ -317,6 +317,90 @@
       </div>
     </div>
     <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
+
+    <div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
+    <div class="grid-graf">
+      <div class="panel">
+        <h3>Parámetros de cobertura</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Volumen (MMBtu/mes)</label>
+            <input type="number" id="cp-vol" value="10000" step="500" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Duración (meses)</label>
+            <input type="number" id="cp-nmeses" value="7" min="1" max="12" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Precio de referencia (spot actual, $/MMBtu)</label>
+          <input type="number" id="cp-spot" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Swap ($/MMBtu)</label>
+            <input type="number" id="cp-swap" value="2.879" step="0.001" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Collar piso</label>
+            <input type="number" id="cp-floor" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Collar techo</label>
+            <input type="number" id="cp-cap" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">HSC vencimiento — mín</label>
+            <input type="range" id="cp-rmin" min="1" max="5" step="0.1" value="1.5" style="width:100%;">
+            <div style="text-align:right; font-size:11px; color:var(--gris);">$<span id="cp-rminlbl">1.50</span></div>
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">HSC vencimiento — máx</label>
+            <input type="range" id="cp-rmax" min="1" max="6" step="0.1" value="4.5" style="width:100%;">
+            <div style="text-align:right; font-size:11px; color:var(--gris);">$<span id="cp-rmaxlbl">4.50</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ctrl" style="justify-content:center;">
+          <span id="cp-toggle" style="display:inline-flex; border:1px solid var(--linea); border-radius:8px; overflow:hidden;">
+            <button class="prod-btn" data-modo="none">Sin cobertura</button>
+            <button class="prod-btn" data-modo="swap">Swap</button>
+            <button class="prod-btn" data-modo="collar">Collar</button>
+          </span>
+        </div>
+        <div class="lienzo alto"><canvas id="c-swapcollar"></canvas></div>
+      </div>
+    </div>
+
+    <div class="cards" style="grid-template-columns:repeat(4,1fr); margin-top:14px;">
+      <div class="card"><div class="nombre">Costo máximo</div><div class="valor" id="cp-maxloss" style="font-size:18px;">—</div></div>
+      <div class="card"><div class="nombre">HSC breakeven</div><div class="valor" id="cp-breakeven" style="font-size:18px;">—</div></div>
+      <div class="card"><div class="nombre">Techo de costo efectivo</div><div class="valor" id="cp-ceiling" style="font-size:18px;">—</div></div>
+      <div class="card"><div class="nombre">Prima total</div><div class="valor" id="cp-premium" style="font-size:18px;">—</div></div>
+    </div>
+
+    <div class="panel ancho" style="margin-top:14px;">
+      <h3>Escenarios</h3>
+      <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+        <thead>
+          <tr style="color:var(--gris); text-align:right;">
+            <th style="text-align:left; padding:6px 8px;">Escenario</th>
+            <th style="padding:6px 8px;">HSC</th>
+            <th style="padding:6px 8px;">Costo sin cobertura</th>
+            <th style="padding:6px 8px;">Costo con cobertura</th>
+            <th style="padding:6px 8px;">Diferencia</th>
+          </tr>
+        </thead>
+        <tbody id="cp-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="cobertura">El costo se muestra vs. el spot de referencia. Un HSC más alto es desfavorable (pagas más gas); el swap fija el costo sin importar el mercado, el collar lo acota dentro de un rango pero deja participar del precio de mercado en la zona media. Se asume swap y collar zero-cost (sin prima explícita).</div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -964,7 +1048,7 @@ function construirGraficas(tab){
 function mostrarTab(tab){
   document.querySelectorAll(".tab").forEach(b=> b.classList.toggle("activo", b.dataset.tab===tab));
   document.querySelectorAll("section").forEach(sec=> sec.classList.toggle("activa", sec.id==="sec-"+tab));
-  if(tab==="swap" && !construido.swap){ iniciarSwap(); construido.swap=true; }
+  if(tab==="swap" && !construido.swap){ iniciarSwap(); iniciarComparador(); construido.swap=true; }
   if(!construido[tab]){ construirGraficas(tab); construido[tab]=true; }
   else { Object.values(charts).forEach(c=> c.resize()); }
 }
@@ -975,14 +1059,27 @@ const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70
 
 function iniciarSwap(){
   const nInput = document.getElementById("sw-nmonths");
+  const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
+  const fuenteEl = document.getElementById("sw-fuente");
+  if(fwdReal && fwdReal.length){
+    nInput.value = fwdReal.length;
+    fuenteEl.textContent = "— Henry Hub real (NYMEX vía Yahoo)";
+    fuenteEl.style.color = "var(--sube)";
+  } else {
+    fuenteEl.textContent = "— valores de ejemplo, edítalos manualmente";
+    fuenteEl.style.color = "var(--baja)";
+  }
   const rebuildMonths = ()=>{
     const n = Math.max(1, Math.min(12, parseInt(nInput.value)||7));
     const cont = document.getElementById("swap-months");
     cont.innerHTML = "";
     for(let i=0;i<n;i++){
+      const usarReal = fwdReal && fwdReal[i];
+      const etiqueta = usarReal ? fwdReal[i].mes : SWAP_MESES[i];
+      const valor = usarReal ? fwdReal[i].precio : SWAP_FWD_DEFAULT[i];
       const div = document.createElement("div");
-      div.innerHTML = `<label style="display:block; font-size:11px; color:var(--gris); margin-bottom:4px; text-transform:uppercase;">${SWAP_MESES[i]}</label>
-        <input type="number" step="0.001" class="sw-fwd prod-sel" style="width:100%;" value="${SWAP_FWD_DEFAULT[i]}">`;
+      div.innerHTML = `<label style="display:block; font-size:11px; color:var(--gris); margin-bottom:4px; text-transform:uppercase;">${etiqueta}</label>
+        <input type="number" step="0.001" class="sw-fwd prod-sel" style="width:100%;" value="${valor}">`;
       cont.appendChild(div);
     }
     cont.querySelectorAll(".sw-fwd").forEach(el=> el.addEventListener("input", calcularSwap));
@@ -1043,6 +1140,139 @@ function calcularSwap(){
 }
 
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
+
+// ---- SWAP vs COLLAR: comparador de escenarios ----
+let cpModo = "swap";
+
+function cpFmtMM(n){
+  const abs = Math.abs(n);
+  const signo = n<0 ? "-" : "";
+  if(abs >= 1e6) return signo+"$"+(abs/1e6).toFixed(2)+"M";
+  if(abs >= 1e3) return signo+"$"+(abs/1e3).toFixed(1)+"K";
+  return signo+"$"+abs.toFixed(0);
+}
+
+function cpCosto(hsc, swapPrice, floor, cap, modo){
+  if(modo==="none") return hsc;
+  if(modo==="swap") return swapPrice;
+  if(modo==="collar") return Math.min(Math.max(hsc, floor), cap);
+  return hsc;
+}
+
+function iniciarComparador(){
+  document.querySelectorAll("#cp-toggle .prod-btn").forEach(b=>{
+    b.classList.toggle("activo", b.dataset.modo===cpModo);
+    b.addEventListener("click", ()=>{
+      cpModo = b.dataset.modo;
+      document.querySelectorAll("#cp-toggle .prod-btn").forEach(x=> x.classList.toggle("activo", x.dataset.modo===cpModo));
+      calcularComparador();
+    });
+  });
+  ["cp-vol","cp-nmeses","cp-spot","cp-swap","cp-floor","cp-cap"].forEach(id=>{
+    document.getElementById(id).addEventListener("input", calcularComparador);
+  });
+  ["cp-rmin","cp-rmax"].forEach(id=>{
+    document.getElementById(id).addEventListener("input", ()=>{
+      document.getElementById("cp-rminlbl").textContent = parseFloat(document.getElementById("cp-rmin").value).toFixed(2);
+      document.getElementById("cp-rmaxlbl").textContent = parseFloat(document.getElementById("cp-rmax").value).toFixed(2);
+      calcularComparador();
+    });
+  });
+  calcularComparador();
+}
+
+function calcularComparador(){
+  const vol = parseFloat(document.getElementById("cp-vol").value)||0;
+  const nmeses = parseFloat(document.getElementById("cp-nmeses").value)||1;
+  const spot = parseFloat(document.getElementById("cp-spot").value)||0;
+  const swapPrice = parseFloat(document.getElementById("cp-swap").value)||0;
+  const floor = parseFloat(document.getElementById("cp-floor").value)||0;
+  const cap = parseFloat(document.getElementById("cp-cap").value)||0;
+  const rMin = parseFloat(document.getElementById("cp-rmin").value)||1;
+  const rMax = parseFloat(document.getElementById("cp-rmax").value)||5;
+  const totalVol = vol*nmeses;
+
+  const N = 60, xs=[];
+  for(let i=0;i<=N;i++){ xs.push(rMin + (rMax-rMin)*i/N); }
+  const noHedgePL = xs.map(h=> -(h-spot)*totalVol);
+  const hedgePL = xs.map(h=> -(cpCosto(h, swapPrice, floor, cap, cpModo) - spot)*totalVol);
+
+  let breakevenTxt;
+  if(cpModo==="swap") breakevenTxt = "$"+swapPrice.toFixed(3);
+  else if(cpModo==="collar") breakevenTxt = `$${floor.toFixed(2)}–$${cap.toFixed(2)}`;
+  else breakevenTxt = "$"+spot.toFixed(3);
+
+  const worst = Math.min(...hedgePL);
+  const ceilingPrice = cpModo==="swap" ? swapPrice : (cpModo==="collar" ? cap : rMax);
+
+  document.getElementById("cp-maxloss").textContent = cpModo==="none" ? "sin límite" : cpFmtMM(worst);
+  document.getElementById("cp-maxloss").style.color = cpModo==="none" ? "var(--baja)" : "var(--tinta)";
+  document.getElementById("cp-breakeven").textContent = breakevenTxt;
+  document.getElementById("cp-ceiling").textContent = "$"+ceilingPrice.toFixed(3);
+  document.getElementById("cp-premium").textContent = "$0";
+
+  const datasets = [
+    { label:"Sin cobertura", data: xs.map((x,i)=>({x,y:noHedgePL[i]})), borderColor:"var(--plata)", borderDash:[6,4], borderWidth:2, pointRadius:0 }
+  ];
+  if(cpModo!=="none"){
+    datasets.push({
+      label: cpModo==="swap" ? "Swap" : "Collar",
+      data: xs.map((x,i)=>({x,y:hedgePL[i]})),
+      borderColor:"#FFC400", borderWidth:2.5, pointRadius:0
+    });
+  }
+
+  if(charts["c-swapcollar"]) charts["c-swapcollar"].destroy();
+  charts["c-swapcollar"] = new Chart(document.getElementById("c-swapcollar"), {
+    type:"line",
+    data:{ datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:"index", intersect:false },
+      plugins:{
+        legend:{ display:true, labels:{ boxWidth:12, font:{size:11}, color:"#cfcfcf" } },
+        tooltip:{ callbacks:{
+          title:(items)=> "HSC: $"+items[0].parsed.x.toFixed(2),
+          label:(item)=> item.dataset.label+": "+cpFmtMM(item.parsed.y)
+        }}
+      },
+      scales:{
+        x:{ type:"linear", min:rMin, max:rMax,
+            title:{ display:true, text:"HSC al vencimiento ($/MMBtu)", color:"var(--gris)" },
+            ticks:{ color:"var(--gris)", callback:(v)=>"$"+v.toFixed(1) },
+            grid:{ color:"rgba(255,255,255,0.06)" } },
+        y:{ title:{ display:true, text:"Costo vs. spot de referencia (USD)", color:"var(--gris)" },
+            ticks:{ color:"var(--gris)", callback:(v)=>cpFmtMM(v) },
+            grid:{ color:"rgba(255,255,255,0.06)" } }
+      }
+    }
+  });
+
+  const escenarios = [
+    { nombre:"Muy desfavorable", hsc: Math.min(rMax, spot*1.4) },
+    { nombre:"Desfavorable", hsc: Math.min(rMax, spot*1.2) },
+    { nombre:"Moderadamente bajo", hsc: Math.max(rMin, spot*0.9) },
+    { nombre:"Precio actual", hsc: spot, hl:true },
+    { nombre:"Favorable (baja fuerte)", hsc: Math.max(rMin, spot*0.7) },
+  ];
+  let rows="";
+  escenarios.forEach(e=>{
+    const costoNo = (e.hsc-spot)*totalVol;
+    const costoHedgeTotal = (cpCosto(e.hsc, swapPrice, floor, cap, cpModo)-spot)*totalVol;
+    const diff = costoNo - costoHedgeTotal;
+    const cNo = costoNo>0?"delta down":costoNo<0?"delta up":"delta flat";
+    const cHedge = cpModo==="none" ? "" : (costoHedgeTotal>0?"delta down":costoHedgeTotal<0?"delta up":"delta flat");
+    const cDiff = cpModo==="none" ? "" : (diff>0?"delta up":diff<0?"delta down":"delta flat");
+    rows += `<tr style="border-bottom:1px solid var(--linea); ${e.hl?'background:var(--tarjeta2);':''}">
+      <td style="padding:8px; ${e.hl?'font-weight:700;':''}">${e.hl?'★ ':''}${e.nombre}</td>
+      <td style="padding:8px; text-align:right;">$${e.hsc.toFixed(2)}</td>
+      <td style="padding:8px; text-align:right;" class="${cNo}">${costoNo===0?'$0':(costoNo>0?'+':'')+cpFmtMM(costoNo)}</td>
+      <td style="padding:8px; text-align:right;" class="${cHedge}">${cpModo==="none"?"—":(costoHedgeTotal===0?'$0':(costoHedgeTotal>0?'+':'')+cpFmtMM(costoHedgeTotal))}</td>
+      <td style="padding:8px; text-align:right;" class="${cDiff}">${cpModo==="none"?"—":(diff===0?'$0':(diff>0?'+':'')+cpFmtMM(diff))}</td>
+    </tr>`;
+  });
+  document.getElementById("cp-tbody").innerHTML = rows;
+}
 
 fetch(DATA_URL)
   .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
