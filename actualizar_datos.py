@@ -303,6 +303,62 @@ def obtener_henry_hub():
     return df.reset_index(drop=True)
 
 
+def obtener_curva_forward_hh(n_meses=7):
+    """
+    Curva forward de Henry Hub (NYMEX) para los próximos n_meses contratos
+    mensuales, vía Yahoo (yfinance). Uso los tickers de mes específico
+    (ej. NGQ26.NYM = agosto 2026), no el front-month continuo NG=F.
+
+    Es dinámico: arranca del mes actual y camina hacia adelante, así que
+    sigue funcionando sin tocar el código mes tras mes. El contrato del
+    mes en curso normalmente ya expiró o está por expirar (vence ~un mes
+    antes de la entrega), así que casi siempre el primero que sí trae
+    datos es el mes siguiente — lo salto sin tronar, igual que hago con
+    cualquier fuente que falle.
+    """
+    letras_mes = {1: "F", 2: "G", 3: "H", 4: "J", 5: "K", 6: "M",
+                  7: "N", 8: "Q", 9: "U", 10: "V", 11: "X", 12: "Z"}
+    nombres_mes = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+    try:
+        import yfinance as yf
+    except Exception as e:
+        log(f"  Aviso: yfinance no disponible para curva forward ({e}); se omite.")
+        return []
+
+    hoy = dt.date.today()
+    curva = []
+    mes, anio = hoy.month, hoy.year
+    intentos = 0
+    # Camino hacia adelante hasta juntar n_meses con dato, o rendirme a los 14 intentos
+    while len(curva) < n_meses and intentos < n_meses + 7:
+        letra = letras_mes[mes]
+        yy = anio % 100
+        ticker = f"NG{letra}{yy:02d}.NYM"
+        etiqueta = f"{nombres_mes[mes]} {anio}"
+        try:
+            tk = yf.Ticker(ticker)
+            hist = tk.history(period="5d")
+            if not hist.empty:
+                precio = round(float(hist["Close"].iloc[-1]), 3)
+                curva.append({"mes": etiqueta, "ticker": ticker, "precio": precio})
+            else:
+                log(f"  Aviso: curva forward sin datos para {etiqueta} ({ticker}); "
+                    "probablemente ya expiró, se omite.")
+        except Exception as e:
+            log(f"  Aviso: curva forward falló para {etiqueta} ({ticker}): {e}")
+
+        mes += 1
+        if mes > 12:
+            mes = 1
+            anio += 1
+        intentos += 1
+
+    log(f"Curva forward HH: {len(curva)} de {n_meses} meses con dato")
+    return curva
+
+
 def obtener_fred(series_id, observation_start=FECHA_INICIO):
     """Una serie diaria/mensual de FRED -> DataFrame[fecha, valor]. Mi función comodín."""
     url = "https://api.stlouisfed.org/fred/series/observations"
@@ -1447,7 +1503,8 @@ def crear_graficos_fx(diario, ruta_png):
 # 3b) Exportar a JSON (esto es lo que lee el panel / GitHub Pages)
 # ------------------------------------------------------------------
 def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
-                  construccion=None, chatarra=None, productores=None):
+                  construccion=None, chatarra=None, productores=None,
+                  curva_forward=None):
     """Tira todo a un JSON compacto que es lo que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -1575,6 +1632,11 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
     if productores:
         obj["productores"] = productores
 
+    # Curva forward de Henry Hub (NYMEX, contratos por mes vía Yahoo). La usa
+    # el calculador de fair value del swap en la pestaña "Swap Gas".
+    if curva_forward:
+        obj["curva_forward_hh"] = curva_forward
+
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
 
@@ -1622,6 +1684,13 @@ def main():
             log(f"  Aviso: la sección de productores falló y se omite: {e}")
             productores = None
 
+        log("Descargando curva forward Henry Hub (Yahoo, contratos por mes)...")
+        try:
+            curva_forward = obtener_curva_forward_hh(n_meses=7)
+        except Exception as e:
+            log(f"  Aviso: la curva forward falló y se omite: {e}")
+            curva_forward = None
+
         xlsx_fecha = CARPETA / f"mercados_{HOY}.xlsx"
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
         png_fecha = CARPETA / f"graficos_{HOY}.png"
@@ -1640,7 +1709,7 @@ def main():
         escribir_json(diario, macro, CARPETA / "datos.json",
                       acereras=acereras, info_acereras=info_ac,
                       construccion=construccion, chatarra=chatarra,
-                      productores=productores)
+                      productores=productores, curva_forward=curva_forward)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
