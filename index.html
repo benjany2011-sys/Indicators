@@ -294,6 +294,55 @@ select:focus{outline:none;border-color:var(--naranja);}
     </div>
     <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
 
+    <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
+    <div class="grid-graf">
+      <div class="panel">
+        <h3>Parámetros de la opción</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Forward ($/MMBtu)</label>
+            <input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad implícita (%)</label>
+            <input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike put (piso)</label>
+            <input type="number" id="b76-kput" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike call (techo)</label>
+            <input type="number" id="b76-kcall" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento</label>
+            <input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%)</label>
+            <input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Primas teóricas</h3>
+        <div class="cards" style="grid-template-columns:1fr 1fr;">
+          <div class="card"><div class="nombre">Prima put (piso)</div><div class="valor" id="b76-pput" style="font-size:18px;">—</div></div>
+          <div class="card"><div class="nombre">Prima call (techo)</div><div class="valor" id="b76-pcall" style="font-size:18px;">—</div></div>
+        </div>
+        <div class="cards" style="grid-template-columns:1fr;margin-top:10px;">
+          <div class="card"><div class="nombre">Diferencia (put − call)</div><div class="valor" id="b76-diff" style="font-size:18px;">—</div></div>
+        </div>
+        <div class="cobertura" id="b76-veredicto">—</div>
+      </div>
+    </div>
+    <div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
+
     <div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
     <div class="grid-graf">
       <div class="panel">
@@ -394,54 +443,6 @@ select:focus{outline:none;border-color:var(--naranja);}
       <div class="cobertura" style="color:#9aa0a6;">"Fair value WMC" y "Swap cotizado" vienen de la calculadora de arriba (usan su propio volumen y meses). "Sin cobertura" y "Collar" vienen del comparador de escenarios, evaluados en el precio de referencia (spot) que configuraste ahí. Como cada calculadora tiene sus propios supuestos de volumen/horizonte, esto es una comparación de órdenes de magnitud, no una suma exacta del mismo contrato.</div>
     </div>
 
-    <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
-    <div class="grid-graf">
-      <div class="panel">
-        <h3>Parámetros de la opción</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Forward ($/MMBtu)</label>
-            <input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad implícita (%)</label>
-            <input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike put (piso)</label>
-            <input type="number" id="b76-kput" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike call (techo)</label>
-            <input type="number" id="b76-kcall" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento</label>
-            <input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%)</label>
-            <input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Primas teóricas</h3>
-        <div class="cards" style="grid-template-columns:1fr 1fr;">
-          <div class="card"><div class="nombre">Prima put (piso)</div><div class="valor" id="b76-pput" style="font-size:18px;">—</div></div>
-          <div class="card"><div class="nombre">Prima call (techo)</div><div class="valor" id="b76-pcall" style="font-size:18px;">—</div></div>
-        </div>
-        <div class="cards" style="grid-template-columns:1fr;margin-top:10px;">
-          <div class="card"><div class="nombre">Diferencia (put − call)</div><div class="valor" id="b76-diff" style="font-size:18px;">—</div></div>
-        </div>
-        <div class="cobertura" id="b76-veredicto">—</div>
-      </div>
-    </div>
-    <div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
   </section>
 
   <section id="sec-archivos" data-screen-label="Archivos">
