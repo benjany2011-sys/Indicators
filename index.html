@@ -139,7 +139,7 @@
   <button class="tab" data-tab="construccion">Construcción</button>
   <button class="tab" data-tab="chatarra">Chatarra</button>
   <button class="tab" data-tab="productores">Productores</button>
-  <button class="tab" data-tab="swap">Swap Gas</button>
+  <button class="tab" data-tab="swap">Coberturas</button>
   <button class="tab" data-tab="archivos">Archivos</button>
 </nav>
 
@@ -316,7 +316,7 @@
       </table>
       </div>
     </div>
-    <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor.</div>
+    <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
 
     <div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
     <div class="grid-graf">
@@ -384,7 +384,10 @@
     </div>
 
     <div class="panel ancho" style="margin-top:14px;">
-      <h3>Escenarios</h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <h3 style="margin:0;">Escenarios</h3>
+        <button class="btn ghost" id="cp-download" style="font-size:12px; padding:6px 12px;">⬇ Descargar .csv</button>
+      </div>
       <div style="overflow-x:auto;">
       <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
         <thead>
@@ -401,6 +404,68 @@
       </div>
     </div>
     <div class="cobertura">El costo se muestra vs. el spot de referencia. Un HSC más alto es desfavorable (pagas más gas); el swap fija el costo sin importar el mercado, el collar lo acota dentro de un rango pero deja participar del precio de mercado en la zona media. Se asume swap y collar zero-cost (sin prima explícita).</div>
+
+    <div class="seccion-titulo" style="margin-top:34px;">Comparación — fair value vs. swap/collar</div>
+    <div class="panel ancho">
+      <p style="font-size:12.5px; color:var(--gris); margin:0 0 12px;">Compara el costo total de las dos simulaciones de arriba para el mismo horizonte, y marca cuál sale más barata.</p>
+      <div class="cards" id="cmp-cards" style="grid-template-columns:repeat(4,1fr);">
+        <div class="card"><div class="nombre">Costo — fair value WMC</div><div class="valor" id="cmp-fair" style="font-size:17px;">—</div></div>
+        <div class="card"><div class="nombre">Costo — swap cotizado</div><div class="valor" id="cmp-swap" style="font-size:17px;">—</div></div>
+        <div class="card"><div class="nombre">Costo — sin cobertura</div><div class="valor" id="cmp-none" style="font-size:17px;">—</div></div>
+        <div class="card"><div class="nombre">Costo — collar</div><div class="valor" id="cmp-collar" style="font-size:17px;">—</div></div>
+      </div>
+      <div class="cobertura" id="cmp-veredicto" style="margin-top:10px;">—</div>
+      <div class="cobertura" style="color:var(--gris);">"Fair value WMC" y "Swap cotizado" vienen de la calculadora de arriba (usan su propio volumen y meses). "Sin cobertura" y "Collar" vienen del comparador de escenarios, evaluados en el precio de referencia (spot) que configuraste ahí. Como cada calculadora tiene sus propios supuestos de volumen/horizonte, esto es una comparación de órdenes de magnitud, no una suma exacta del mismo contrato.</div>
+    </div>
+
+    <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
+    <div class="grid-graf">
+      <div class="panel">
+        <h3>Parámetros de la opción</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Forward ($/MMBtu)</label>
+            <input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Volatilidad implícita (%)</label>
+            <input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Strike put (piso)</label>
+            <input type="number" id="b76-kput" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Strike call (techo)</label>
+            <input type="number" id="b76-kcall" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Días al vencimiento</label>
+            <input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:var(--gris); margin-bottom:4px;">Tasa libre de riesgo (%)</label>
+            <input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Primas teóricas</h3>
+        <div class="cards" style="grid-template-columns:1fr 1fr;">
+          <div class="card"><div class="nombre">Prima put (piso)</div><div class="valor" id="b76-pput" style="font-size:18px;">—</div></div>
+          <div class="card"><div class="nombre">Prima call (techo)</div><div class="valor" id="b76-pcall" style="font-size:18px;">—</div></div>
+        </div>
+        <div class="cards" style="grid-template-columns:1fr; margin-top:10px;">
+          <div class="card"><div class="nombre">Diferencia (put − call)</div><div class="valor" id="b76-diff" style="font-size:18px;">—</div></div>
+        </div>
+        <div class="cobertura" id="b76-veredicto">—</div>
+      </div>
+    </div>
+    <div class="cobertura" style="color:var(--gris);">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
   </section>
 
   <!-- ARCHIVOS -->
@@ -410,7 +475,7 @@
       <div class="archivo">
         <h4>Excel completo</h4>
         <p>Todas las series con formato: resumen, datos diarios, inflación y gráficas por divisa.</p>
-        <a class="btn" href="resultados/mercados_reciente.xlsx">⬇ Descargar .xlsx</a>
+        <a class="btn" id="dl-excel" href="resultados/mercados_reciente.xlsx">⬇ Descargar .xlsx</a>
       </div>
       <div class="archivo">
         <h4>Panel general (imagen)</h4>
@@ -1053,6 +1118,30 @@ function mostrarTab(tab){
   else { Object.values(charts).forEach(c=> c.resize()); }
 }
 
+// ---- Comparación entre las dos simulaciones (fair value vs swap/collar) ----
+const COMPARACION = { fair:null, swap:null, none:null, collar:null };
+
+function actualizarComparacion(){
+  const { fair, swap, none, collar } = COMPARACION;
+  if(fair===null || swap===null || none===null || collar===null) return;
+  const fmt = (n)=> "$"+n.toLocaleString(undefined,{maximumFractionDigits:0});
+  document.getElementById("cmp-fair").textContent = fmt(fair);
+  document.getElementById("cmp-swap").textContent = fmt(swap);
+  document.getElementById("cmp-none").textContent = fmt(none);
+  document.getElementById("cmp-collar").textContent = fmt(collar);
+
+  const opciones = [
+    { nombre:"Fair value WMC", valor:fair },
+    { nombre:"Swap cotizado", valor:swap },
+    { nombre:"Sin cobertura (al spot de referencia)", valor:none },
+    { nombre:"Collar", valor:collar },
+  ];
+  opciones.sort((a,b)=> a.valor-b.valor);
+  const mejor = opciones[0];
+  const veredicto = document.getElementById("cmp-veredicto");
+  veredicto.innerHTML = `<b>Más barata: ${mejor.nombre}</b> (${fmt(mejor.valor)}). Orden completo, de menor a mayor costo: ${opciones.map(o=>o.nombre+" "+fmt(o.valor)).join(" · ")}.`;
+}
+
 // ---- SWAP GAS: fair value calculator ----
 const SWAP_MESES = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar","Abr","May"];
 const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70,2.68];
@@ -1137,6 +1226,10 @@ function calcularSwap(){
   } else {
     verdict.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Revisar —</span> el swap cotizado a $${swapPrice.toFixed(3)} implica un margen de $${impliedMargin.toFixed(3)} sobre el fair value, arriba de tu objetivo de $${targetMargin.toFixed(3)}. Hay espacio para negociar.`;
   }
+
+  COMPARACION.fair = totalFairCost;
+  COMPARACION.swap = totalSwapCost;
+  actualizarComparacion();
 }
 
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
@@ -1256,6 +1349,7 @@ function calcularComparador(){
     { nombre:"Favorable (baja fuerte)", hsc: Math.max(rMin, spot*0.7) },
   ];
   let rows="";
+  const csvRows = [["Escenario","HSC","Costo sin cobertura","Costo con cobertura","Diferencia"]];
   escenarios.forEach(e=>{
     const costoNo = (e.hsc-spot)*totalVol;
     const costoHedgeTotal = (cpCosto(e.hsc, swapPrice, floor, cap, cpModo)-spot)*totalVol;
@@ -1270,8 +1364,105 @@ function calcularComparador(){
       <td style="padding:8px; text-align:right;" class="${cHedge}">${cpModo==="none"?"—":(costoHedgeTotal===0?'$0':(costoHedgeTotal>0?'+':'')+cpFmtMM(costoHedgeTotal))}</td>
       <td style="padding:8px; text-align:right;" class="${cDiff}">${cpModo==="none"?"—":(diff===0?'$0':(diff>0?'+':'')+cpFmtMM(diff))}</td>
     </tr>`;
+    csvRows.push([e.nombre, e.hsc.toFixed(3), costoNo.toFixed(2), cpModo==="none"?"":costoHedgeTotal.toFixed(2), cpModo==="none"?"":diff.toFixed(2)]);
   });
   document.getElementById("cp-tbody").innerHTML = rows;
+  window.ESCENARIOS_CSV = csvRows;
+
+  COMPARACION.none = spot*totalVol;
+  COMPARACION.collar = cpCosto(spot, swapPrice, floor, cap, "collar")*totalVol;
+  actualizarComparacion();
+}
+
+// ---- Candado de acceso (Coberturas + descarga de Excel) ----
+const COB_HASH = "772b17f5d551de57fcdfe7e3ec743aa6c3351081a65158729d6333e91fa74b0a";
+let cobAuth = sessionStorage.getItem("cob_auth") === "1";
+
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=> b.toString(16).padStart(2,"0")).join("");
+}
+
+async function pedirPassword(){
+  if(cobAuth) return true;
+  const intento = prompt("Esta sección requiere contraseña:");
+  if(intento===null || intento==="") return false;
+  const hash = await sha256Hex(intento);
+  if(hash===COB_HASH){
+    cobAuth = true;
+    sessionStorage.setItem("cob_auth","1");
+    return true;
+  }
+  alert("Contraseña incorrecta.");
+  return false;
+}
+
+// ---- Descarga CSV de Escenarios ----
+function descargarEscenariosCSV(){
+  const rows = window.ESCENARIOS_CSV;
+  if(!rows) return;
+  const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "escenarios_cobertura.csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---- Black-76: valuación de opciones sobre futuros ----
+function normCDF(x){
+  const t = 1/(1+0.2316419*Math.abs(x));
+  const d = 0.3989423*Math.exp(-x*x/2);
+  let p = d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+  if(x>0) p = 1-p;
+  return p;
+}
+
+function black76(fwd, strike, volPct, dias, rPct){
+  const sigma = volPct/100, T = dias/365, r = rPct/100;
+  if(fwd<=0 || strike<=0 || sigma<=0 || T<=0) return {call:0, put:0};
+  const d1 = (Math.log(fwd/strike) + (sigma*sigma/2)*T) / (sigma*Math.sqrt(T));
+  const d2 = d1 - sigma*Math.sqrt(T);
+  const disc = Math.exp(-r*T);
+  const call = disc*(fwd*normCDF(d1) - strike*normCDF(d2));
+  const put = disc*(strike*normCDF(-d2) - fwd*normCDF(-d1));
+  return {call, put};
+}
+
+function calcularBlack76(){
+  const fwd = parseFloat(document.getElementById("b76-fwd").value)||0;
+  const vol = parseFloat(document.getElementById("b76-vol").value)||0;
+  const kPut = parseFloat(document.getElementById("b76-kput").value)||0;
+  const kCall = parseFloat(document.getElementById("b76-kcall").value)||0;
+  const dias = parseFloat(document.getElementById("b76-dias").value)||0;
+  const r = parseFloat(document.getElementById("b76-r").value)||0;
+
+  const put = black76(fwd, kPut, vol, dias, r).put;
+  const call = black76(fwd, kCall, vol, dias, r).call;
+  const diff = put - call;
+
+  document.getElementById("b76-pput").textContent = "$"+put.toFixed(4);
+  document.getElementById("b76-pcall").textContent = "$"+call.toFixed(4);
+  const diffEl = document.getElementById("b76-diff");
+  diffEl.textContent = (diff>=0?"+":"")+"$"+diff.toFixed(4);
+  diffEl.style.color = Math.abs(diff)<0.01 ? "var(--tinta)" : (diff>0 ? "var(--baja)" : "var(--sube)");
+
+  const veredicto = document.getElementById("b76-veredicto");
+  if(Math.abs(diff) < 0.01){
+    veredicto.innerHTML = `<span style="color:var(--sube); font-weight:700;">✓ Aprox. costo cero —</span> el put y el call teóricos están prácticamente balanceados con esta volatilidad.`;
+  } else if(diff>0){
+    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Put &gt; Call —</span> el piso teóricamente vale más que el techo; para que el collar sea costo cero, el bróker debería pagarte una prima neta de $${diff.toFixed(4)}/MMBtu, o tendrías que subir el piso / bajar el techo.`;
+  } else {
+    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Call &gt; Put —</span> el techo teóricamente vale más que el piso; tendrías que pagar una prima neta de $${(-diff).toFixed(4)}/MMBtu, o bajar el piso / subir el techo para llegar a costo cero.`;
+  }
+}
+
+function iniciarBlack76(){
+  ["b76-fwd","b76-vol","b76-kput","b76-kcall","b76-dias","b76-r"].forEach(id=>{
+    document.getElementById(id).addEventListener("input", calcularBlack76);
+  });
+  calcularBlack76();
 }
 
 fetch(DATA_URL)
@@ -1334,9 +1525,34 @@ function render(d){
   construirProductores();  // tarjetas + toggle de Productores (worldsteel)
   construirAcereras();// tarjeta de correlación + cobertura
 
-  // pestañas
-  document.querySelectorAll(".tab").forEach(b=> b.addEventListener("click", ()=> mostrarTab(b.dataset.tab)));
+  // pestañas (Coberturas pide contraseña la primera vez por sesión)
+  document.querySelectorAll(".tab").forEach(b=> b.addEventListener("click", async ()=>{
+    if(b.dataset.tab==="swap" && !cobAuth){
+      const ok = await pedirPassword();
+      if(!ok) return;
+    }
+    mostrarTab(b.dataset.tab);
+  }));
   mostrarTab("divisas");   // pestaña inicial
+
+  // descarga de Excel (misma contraseña que Coberturas)
+  const dlExcel = document.getElementById("dl-excel");
+  if(dlExcel){
+    dlExcel.addEventListener("click", async (e)=>{
+      if(!cobAuth){
+        e.preventDefault();
+        const ok = await pedirPassword();
+        if(ok) window.location.href = dlExcel.getAttribute("href");
+      }
+    });
+  }
+
+  // botón de descarga de Escenarios
+  const cpDl = document.getElementById("cp-download");
+  if(cpDl) cpDl.addEventListener("click", descargarEscenariosCSV);
+
+  // calculadora Black-76
+  iniciarBlack76();
 }
 </script>
 </body>
