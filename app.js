@@ -758,6 +758,8 @@ function actualizarComparacion(){
 const SWAP_MESES = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar","Abr","May"];
 const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70,2.68];
 
+let SW_SELECTED_K = 1;
+
 function iniciarSwap(){
   const nInput = document.getElementById("sw-nmonths");
   const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
@@ -790,6 +792,25 @@ function iniciarSwap(){
   ["sw-beta","sw-int","sw-vol","sw-margin","sw-price"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularSwap);
   });
+
+  const seeEl = document.getElementById("sw-see");
+  const marginEl = document.getElementById("sw-margin");
+  const applyTargetMarginFromK = ()=>{
+    const see = parseFloat(seeEl.value)||0;
+    marginEl.value = (SW_SELECTED_K*see).toFixed(3);
+    calcularSwap();
+  };
+  document.querySelectorAll(".sw-kbtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".sw-kbtn").forEach(b=>b.classList.remove("activo"));
+      btn.classList.add("activo");
+      SW_SELECTED_K = parseFloat(btn.dataset.k);
+      applyTargetMarginFromK();
+    });
+  });
+  seeEl.addEventListener("input", applyTargetMarginFromK);
+  applyTargetMarginFromK();
+
   rebuildMonths();
 }
 
