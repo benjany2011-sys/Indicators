@@ -872,6 +872,11 @@ function calcularSwap(){
     const fwdInput = document.getElementById("b76-fwd");
     if(avg!=null && fwdInput){ fwdInput.value = avg.toFixed(3); calcularBlack76(); }
   }
+  if(!b76DiasManual){
+    const diasProm = promedioDiasVenc();
+    const diasInput = document.getElementById("b76-dias");
+    if(diasProm!=null && diasInput){ diasInput.value = diasProm; calcularBlack76(); }
+  }
 }
 
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
@@ -1072,9 +1077,12 @@ function black76(fwd, strike, volPct, dias, rPct){
   return {call, put};
 }
 
-// se pone en true en cuanto el usuario edita el forward de Black-76 a mano;
-// mientras siga en false, lo mantenemos sincronizado con el promedio de la curva HSC.
+// se ponen en true en cuanto el usuario edita el campo a mano; mientras
+// sigan en false, los mantenemos sincronizados con los datos automáticos.
 let b76FwdManual = false;
+let b76VolManual = false;
+let b76DiasManual = false;
+let b76RManual = false;
 
 function promedioCurvaHSC(){
   const inputs = document.querySelectorAll(".sw-fwd");
@@ -1088,6 +1096,15 @@ function promedioCurvaHSC(){
   const arr = (fwdReal && fwdReal.length) ? fwdReal.slice(0,nMonths).map(x=>x.precio) : SWAP_FWD_DEFAULT.slice(0,nMonths);
   if(!arr.length) return null;
   return arr.reduce((a,b)=>a+b,0)/arr.length;
+}
+
+function promedioDiasVenc(){
+  const nMonths = parseInt(document.getElementById("sw-nmonths")?.value)||7;
+  const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
+  if(!fwdReal || !fwdReal.length) return null;
+  const vals = fwdReal.slice(0,nMonths).map(x=>x.dias_venc).filter(v=>typeof v==="number" && v>0);
+  if(!vals.length) return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
 
 function calcularBlack76(){
@@ -1120,9 +1137,45 @@ function calcularBlack76(){
 
 function iniciarBlack76(){
   const fwdInput = document.getElementById("b76-fwd");
+  const volInput = document.getElementById("b76-vol");
+  const diasInput = document.getElementById("b76-dias");
+  const rInput = document.getElementById("b76-r");
+
   const avg = promedioCurvaHSC();
   if(avg!=null) fwdInput.value = avg.toFixed(3);
   fwdInput.addEventListener("input", ()=>{ b76FwdManual = true; });
+
+  const volFuenteEl = document.getElementById("b76-vol-fuente");
+  if(DATA && typeof DATA.volatilidad_hh === "number"){
+    if(!b76VolManual) volInput.value = DATA.volatilidad_hh;
+    if(volFuenteEl){ volFuenteEl.textContent = "— auto: histórica 30d, Henry Hub"; volFuenteEl.style.color = "var(--sube)"; }
+  } else if(volFuenteEl){
+    volFuenteEl.textContent = "— sin dato automático, edítala manualmente";
+    volFuenteEl.style.color = "var(--baja)";
+  }
+  volInput.addEventListener("input", ()=>{ b76VolManual = true; });
+
+  const diasProm = promedioDiasVenc();
+  const diasFuenteEl = document.getElementById("b76-dias-fuente");
+  if(diasProm!=null){
+    if(!b76DiasManual) diasInput.value = diasProm;
+    if(diasFuenteEl){ diasFuenteEl.textContent = "— auto: promedio de tu strip (aprox. 3 días hábiles antes del mes de entrega)"; diasFuenteEl.style.color = "var(--sube)"; }
+  } else if(diasFuenteEl){
+    diasFuenteEl.textContent = "— sin dato automático, edítalo manualmente";
+    diasFuenteEl.style.color = "var(--baja)";
+  }
+  diasInput.addEventListener("input", ()=>{ b76DiasManual = true; });
+
+  const rFuenteEl = document.getElementById("b76-r-fuente");
+  if(DATA && typeof DATA.tasa_libre_riesgo === "number"){
+    if(!b76RManual) rInput.value = DATA.tasa_libre_riesgo;
+    if(rFuenteEl){ rFuenteEl.textContent = "— auto: Treasury 3m (FRED)"; rFuenteEl.style.color = "var(--sube)"; }
+  } else if(rFuenteEl){
+    rFuenteEl.textContent = "— sin dato automático, edítala manualmente";
+    rFuenteEl.style.color = "var(--baja)";
+  }
+  rInput.addEventListener("input", ()=>{ b76RManual = true; });
+
   ["b76-fwd","b76-vol","b76-kput","b76-kcall","b76-dias","b76-r"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularBlack76);
   });
