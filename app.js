@@ -160,7 +160,7 @@ const LOGO_DOMINIO_ACERERA = {
 function logoAcerera(nombre){
   const dom = LOGO_DOMINIO_ACERERA[nombre];
   if(!dom) return "";
-  return "<img class='logo-acerera' src='https://img.logo.dev/"+dom+"?token=pk_ViN51m9GS9qe0Tbrjv4Sqw&size=64' alt='' onerror=\"this.remove()\">";
+  return "<img class='logo-acerera' src='https://logo.clearbit.com/"+dom+"?size=64' alt='' onerror=\"this.remove()\">";
 }
 
 const NOMBRE_DIVISA = {
@@ -842,6 +842,12 @@ function calcularSwap(){
   COMPARACION.fair = totalFairCost;
   COMPARACION.swap = totalSwapCost;
   actualizarComparacion();
+
+  if(!b76FwdManual){
+    const avg = promedioCurvaHSC();
+    const fwdInput = document.getElementById("b76-fwd");
+    if(avg!=null && fwdInput){ fwdInput.value = avg.toFixed(3); calcularBlack76(); }
+  }
 }
 
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
@@ -1042,6 +1048,24 @@ function black76(fwd, strike, volPct, dias, rPct){
   return {call, put};
 }
 
+// se pone en true en cuanto el usuario edita el forward de Black-76 a mano;
+// mientras siga en false, lo mantenemos sincronizado con el promedio de la curva HSC.
+let b76FwdManual = false;
+
+function promedioCurvaHSC(){
+  const inputs = document.querySelectorAll(".sw-fwd");
+  if(inputs.length){
+    const vals = Array.from(inputs).map(el=>parseFloat(el.value)||0).filter(v=>v>0);
+    if(vals.length) return vals.reduce((a,b)=>a+b,0)/vals.length;
+  }
+  // si aún no se ha construido la pestaña de Coberturas, usamos la misma fuente que usaría iniciarSwap()
+  const nMonths = parseInt(document.getElementById("sw-nmonths")?.value)||7;
+  const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
+  const arr = (fwdReal && fwdReal.length) ? fwdReal.slice(0,nMonths).map(x=>x.precio) : SWAP_FWD_DEFAULT.slice(0,nMonths);
+  if(!arr.length) return null;
+  return arr.reduce((a,b)=>a+b,0)/arr.length;
+}
+
 function calcularBlack76(){
   const fwd = parseFloat(document.getElementById("b76-fwd").value)||0;
   const vol = parseFloat(document.getElementById("b76-vol").value)||0;
@@ -1071,6 +1095,10 @@ function calcularBlack76(){
 }
 
 function iniciarBlack76(){
+  const fwdInput = document.getElementById("b76-fwd");
+  const avg = promedioCurvaHSC();
+  if(avg!=null) fwdInput.value = avg.toFixed(3);
+  fwdInput.addEventListener("input", ()=>{ b76FwdManual = true; });
   ["b76-fwd","b76-vol","b76-kput","b76-kcall","b76-dias","b76-r"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularBlack76);
   });
