@@ -759,6 +759,7 @@ const SWAP_MESES = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar",
 const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70,2.68];
 
 let SW_SELECTED_K = 1;
+let SW_CURRENT_MESES = SWAP_MESES.slice();
 
 function iniciarSwap(){
   const nInput = document.getElementById("sw-nmonths");
@@ -776,10 +777,12 @@ function iniciarSwap(){
     const n = Math.max(1, Math.min(12, parseInt(nInput.value)||7));
     const cont = document.getElementById("swap-months");
     cont.innerHTML = "";
+    SW_CURRENT_MESES = [];
     for(let i=0;i<n;i++){
       const usarReal = fwdReal && fwdReal[i];
       const etiqueta = usarReal ? fwdReal[i].mes : SWAP_MESES[i];
       const valor = usarReal ? fwdReal[i].precio : SWAP_FWD_DEFAULT[i];
+      SW_CURRENT_MESES.push(etiqueta);
       const div = document.createElement("div");
       div.innerHTML = `<label style="display:block; font-size:11px; color:var(--gris); margin-bottom:4px; text-transform:uppercase;">${etiqueta}</label>
         <input type="number" step="0.001" class="sw-fwd prod-sel" style="width:100%;" value="${valor}">`;
@@ -829,7 +832,7 @@ function calcularSwap(){
     const swapCost = swapPrice*volume;
     totalVol+=volume; totalFairCost+=cost; totalSwapCost+=swapCost; weightedFairSum+=fairWMC*volume;
     rows += `<tr style="border-bottom:1px solid var(--linea);">
-      <td style="padding:6px 8px;">${SWAP_MESES[i]}</td>
+      <td style="padding:6px 8px;">${SW_CURRENT_MESES[i] || SWAP_MESES[i]}</td>
       <td style="padding:6px 8px; text-align:right;">$${hsc.toFixed(3)}</td>
       <td style="padding:6px 8px; text-align:right;">$${fairWMC.toFixed(3)}</td>
       <td style="padding:6px 8px; text-align:right;">$${swapPrice.toFixed(3)}</td>
