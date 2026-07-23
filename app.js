@@ -160,7 +160,7 @@ const LOGO_DOMINIO_ACERERA = {
 function logoAcerera(nombre){
   const dom = LOGO_DOMINIO_ACERERA[nombre];
   if(!dom) return "";
-  return "<img class='logo-acerera' src='https://logo.clearbit.com/"+dom+"?size=64' alt='' onerror=\"this.remove()\">";
+  return "<img class='logo-acerera' src='https://img.logo.dev/"+dom+"?token=pk_ViN51m9GS9qe0Tbrjv4Sqw&size=64' alt='' onerror=\"this.remove()\">";
 }
 
 const NOMBRE_DIVISA = {
