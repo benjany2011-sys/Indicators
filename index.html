@@ -301,8 +301,9 @@ select:focus{outline:none;border-color:var(--naranja);}
 <input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
 </div>
 <div>
-<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad implícita (%)</label>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad (%) <span id="b76-vol-fuente" style="font-style:italic;"></span></label>
 <input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
+<a href="https://www.cmegroup.com/markets/energy/natural-gas/natural-gas.settlements.options.html" target="_blank" rel="noopener" style="display:inline-block;margin-top:5px;font-size:11px;color:var(--naranja);text-decoration:none;">↗ Ver volatilidad implícita real en CME (gratis)</a>
 </div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
@@ -317,11 +318,11 @@ select:focus{outline:none;border-color:var(--naranja);}
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
 <div>
-<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento</label>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento <span id="b76-dias-fuente" style="font-style:italic;"></span></label>
 <input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
 </div>
 <div>
-<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%)</label>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%) <span id="b76-r-fuente" style="font-style:italic;"></span></label>
 <input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
 </div>
 </div>
@@ -338,7 +339,7 @@ select:focus{outline:none;border-color:var(--naranja);}
 <div class="cobertura" id="b76-veredicto">—</div>
 </div>
 </div>
-<div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
+<div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad se autocompleta con la <b>volatilidad histórica (realizada) de 30 días de Henry Hub</b> — no es lo mismo que la volatilidad implícita real de las opciones de CME (lo que el mercado está pagando hoy por la incertidumbre futura), pero es un sustituto razonable cuando no tienes acceso directo a esos datos. Usa el enlace "Ver volatilidad implícita real en CME" junto al campo para consultar la volatilidad real gratis (liquidaciones de opciones de Henry Hub, por strike y vencimiento) y sobreescribe el campo a mano si quieres un resultado más preciso. Los "Días al vencimiento" se estiman como 3 días hábiles antes del inicio de cada mes de entrega (regla aproximada de CME, sin considerar feriados), y la tasa libre de riesgo viene del Treasury a 3 meses (FRED). Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
 <div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
 <div class="grid-graf">
 <div class="panel">
