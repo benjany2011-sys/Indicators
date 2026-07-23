@@ -124,6 +124,45 @@ function tarjeta(r){
 function esFX(nombre){ return nombre.indexOf(" por USD")>-1 || nombre.indexOf("USD por ")===0; }
 
 // nombre amigable de cada divisa para el texto interpretativo
+// dominio de cada acerera, para pedirle el logo a Clearbit (gratis, sin key).
+// si una empresa no está aquí, o el logo falla, la tarjeta se ve igual que antes.
+const LOGO_DOMINIO_ACERERA = {
+  "ArcelorMittal":         "arcelormittal.com",
+  "POSCO":                 "posco.co.kr",
+  "Ternium":               "ternium.com",
+  "Gerdau":                "gerdau.com",
+  "Nippon Steel":          "nipponsteel.com",
+  "thyssenkrupp":          "thyssenkrupp.com",
+  "SSAB":                  "ssab.com",
+  "Nucor":                 "nucor.com",
+  "Steel Dynamics":        "steeldynamics.com",
+  "Cleveland-Cliffs":      "clevelandcliffs.com",
+  "Commercial Metals":     "cmc.com",
+  "Reliance":              "reliancesteel.com",
+  "Worthington":           "worthingtonindustries.com",
+  "ATI":                   "atimaterials.com",
+  "Carpenter Technology":  "cartech.com",
+  "Baoshan Iron & Steel":  "baosteel.com",
+  "Angang Steel":          "ansteel.cn",
+  "Maanshan Iron & Steel": "magang.com.cn",
+  "HBIS":                  "hbisco.com",
+  "Shougang":              "shougang.com.cn",
+  "Tata Steel":            "tatasteel.com",
+  "JSW Steel":             "jsw.in",
+  "SAIL":                  "sail.co.in",
+  "Jindal Steel":          "jindalsteelpower.com",
+  "Insteel Industries":    "insteel.com",
+  "Metallus":              "metallusinc.com",
+  "Friedman Industries":   "friedmanindustries.com"
+};
+// <img> del logo, o "" si no tenemos dominio para esa empresa.
+// onerror la quita sola si Clearbit no tiene el logo (empresa chica, ADR OTC, etc.)
+function logoAcerera(nombre){
+  const dom = LOGO_DOMINIO_ACERERA[nombre];
+  if(!dom) return "";
+  return "<img class='logo-acerera' src='https://logo.clearbit.com/"+dom+"?size=64' alt='' onerror=\"this.remove()\">";
+}
+
 const NOMBRE_DIVISA = {
   EUR:"el euro", JPY:"el yen", CNY:"el yuan", GBP:"la libra", MXN:"el peso",
   CAD:"el dólar canadiense", TRY:"la lira turca", BRL:"el real brasileño", AUD:"el dólar australiano",
@@ -444,7 +483,7 @@ function tarjetaPrecio(p){
   const el=document.createElement("div"); el.className="card";
   const etiq = (p.pais || p.grupo) ? "<div class='interp'>"+(p.pais || p.grupo)+"</div>" : "";
   el.innerHTML =
-    "<div class='nombre'>"+p.nombre+"</div>"+
+    "<div class='nombre'>"+logoAcerera(p.nombre)+p.nombre+"</div>"+
     "<div class='valor'>$"+(p.valor!=null? p.valor.toLocaleString("es-MX",{minimumFractionDigits:2, maximumFractionDigits:2}) : "—")+"</div>"+
     "<div class='delta-linea'>"+htmlDelta(c)+"</div>"+
     etiq+
