@@ -47,7 +47,8 @@ section.activa{display:block;animation:sec-fade .2s ease;}
 .card{background:var(--tarjeta);border:1px solid var(--linea);border-radius:10px;padding:14px 16px 12px;box-shadow:0 1px 3px rgba(0,0,0,.25);position:relative;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease;}
 .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad);}
 .card:hover{border-color:var(--naranja);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.35);}
-.card .nombre{font-size:13.5px;color:var(--tinta);font-weight:800;letter-spacing:.2px;min-height:30px;}
+.card .nombre{font-size:13.5px;color:var(--tinta);font-weight:800;letter-spacing:.2px;min-height:30px;display:flex;align-items:center;gap:6px;}
+.logo-acerera{width:18px;height:18px;object-fit:contain;border-radius:4px;background:#fff;padding:2px;flex:none;}
 .card .valor{font-size:24px;font-weight:700;color:var(--gold);margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
 .card.destacada{grid-column:span 2;}
 .card.destacada .valor{font-size:32px;}
