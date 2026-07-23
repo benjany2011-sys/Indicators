@@ -5,38 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de mercados</title>
 <template id="__bundler_thumbnail" data-bg-color="#1f1f23">
-  <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#FFC400"/>
-        <stop offset="50%" stop-color="#FF7A18"/>
-        <stop offset="100%" stop-color="#E62315"/>
-      </linearGradient>
-    </defs>
-    <rect width="120" height="80" fill="#1f1f23"/>
-    <rect x="18" y="46" width="10" height="18" rx="2" fill="url(#g)"/>
-    <rect x="34" y="34" width="10" height="30" rx="2" fill="url(#g)"/>
-    <rect x="50" y="22" width="10" height="42" rx="2" fill="url(#g)"/>
-    <path d="M70 50 L82 38 L92 44 L102 20" stroke="url(#g)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
+<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#FFC400"/>
+<stop offset="50%" stop-color="#FF7A18"/>
+<stop offset="100%" stop-color="#E62315"/>
+</linearGradient>
+</defs>
+<rect width="120" height="80" fill="#1f1f23"/>
+<rect x="18" y="46" width="10" height="18" rx="2" fill="url(#g)"/>
+<rect x="34" y="34" width="10" height="30" rx="2" fill="url(#g)"/>
+<rect x="50" y="22" width="10" height="42" rx="2" fill="url(#g)"/>
+<path d="M70 50 L82 38 L92 44 L102 20" stroke="url(#g)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
 </template>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<!-- zoom/pan en las gráficas (rueda = zoom, arrastrar = caja de zoom, ctrl+arrastrar = mover, doble clic = reset) -->
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script src="app.js"></script>
 <style>
 :root{
-  --gold:#FFC400; --naranja:#FF7A18; --rojo:#E62315; --plata:#B8BCC0;
-  --grad:linear-gradient(120deg,#FFC400 0%,#FF7A18 50%,#E62315 100%);
-  --bg:#1f1f23; --tarjeta:#2a2a30; --tarjeta2:#32323a;
-  --tinta:#ECECEC; --gris:#9aa0a6; --linea:#3a3a42;
-  --sube:#37d67a; --baja:#ff5b5b;
+--gold:#FFC400; --naranja:#FF7A18; --rojo:#E62315; --plata:#B8BCC0;
+--grad:linear-gradient(120deg,#FFC400 0%,#FF7A18 50%,#E62315 100%);
+--bg:#1f1f23; --tarjeta:#2a2a30; --tarjeta2:#32323a;
+--tinta:#ECECEC; --gris:#9aa0a6; --linea:#3a3a42;
+--sube:#37d67a; --baja:#ff5b5b;
 }
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--tinta);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45;}
 a{color:var(--gold);} a:hover{color:#FF9D2E;}
-/* ——— lo siguiente estiliza contenido generado por app.js (tarjetas, paneles, tablas) ——— */
 .tab{background:none;border:none;color:var(--gris);cursor:pointer;font-size:14px;font-weight:700;padding:14px 18px;border-bottom:3px solid transparent;white-space:nowrap;transition:color .15s ease;font-family:inherit;}
 .tab:hover{color:var(--tinta);}
 .tab.activo{color:var(--tinta);border-image:var(--grad) 1;border-bottom-style:solid;border-bottom-width:3px;}
@@ -49,7 +47,7 @@ section.activa{display:block;animation:sec-fade .2s ease;}
 .card{background:var(--tarjeta);border:1px solid var(--linea);border-radius:10px;padding:14px 16px 12px;box-shadow:0 1px 3px rgba(0,0,0,.25);position:relative;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease;}
 .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad);}
 .card:hover{border-color:var(--naranja);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.35);}
-.card .nombre{font-size:12px;color:var(--gris);font-weight:600;min-height:30px;}
+.card .nombre{font-size:13.5px;color:var(--tinta);font-weight:800;letter-spacing:.2px;min-height:30px;}
 .card .valor{font-size:24px;font-weight:700;color:var(--gold);margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
 .card.destacada{grid-column:span 2;}
 .card.destacada .valor{font-size:32px;}
@@ -98,375 +96,353 @@ select:focus{outline:none;border-color:var(--naranja);}
 .btn.ghost:hover{border-color:var(--naranja);filter:none;color:var(--tinta);}
 #aviso{display:none;background:#3a2e12;border:1px solid #7a5d12;color:#ffd98a;padding:14px 16px;border-radius:10px;margin:20px;font-size:14px;}
 #aviso code{color:#ffe6a8;}
-
 </style>
 </head>
 <body>
 <header style="background:#26262b;border-bottom:3px solid transparent;border-image:linear-gradient(120deg,#FFC400 0%,#FF7A18 50%,#E62315 100%) 1;box-shadow:0 2px 10px rgba(0,0,0,.35);">
-  <div style="max-width:1180px;margin:0 auto;padding:24px 20px 18px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;">
-    <div>
-      <h1 style="margin:0 0 6px;font-size:30px;font-weight:800;letter-spacing:.2px;background:linear-gradient(120deg,#FFC400 0%,#FF7A18 50%,#E62315 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;">Panel de mercados</h1>
-      <div style="font-size:13px;color:#9aa0a6;">Divisas · Commodities · Acero · Macro EE.&nbsp;UU. · Coberturas</div>
-    </div>
-    <div style="text-align:right;">
-      <div class="meta" id="meta" style="font-size:13px;color:#9aa0a6;">Cargando datos…</div>
-      <div class="meta" id="reloj" style="font-size:12px;color:#9aa0a6;margin-top:2px;"></div>
-    </div>
-  </div>
+<div style="max-width:1180px;margin:0 auto;padding:24px 20px 18px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+<div>
+<h1 style="margin:0 0 6px;font-size:30px;font-weight:800;letter-spacing:.2px;background:linear-gradient(120deg,#FFC400 0%,#FF7A18 50%,#E62315 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;">Panel de mercados</h1>
+<div style="font-size:13px;color:#9aa0a6;">Divisas · Commodities · Acero · Macro EE.&nbsp;UU. · Coberturas</div>
+</div>
+<div style="text-align:right;">
+<div class="meta" id="meta" style="font-size:13px;color:#9aa0a6;">Cargando datos…</div>
+<div class="meta" id="reloj" style="font-size:12px;color:#9aa0a6;margin-top:2px;"></div>
+</div>
+</div>
 </header>
-
 <nav id="tabs" style="background:#202024;border-bottom:1px solid #3a3a42;position:sticky;top:0;z-index:10;overflow-x:auto;">
-  <div style="max-width:1180px;margin:0 auto;padding:0 12px;display:flex;gap:4px;">
-    <button class="tab activo" data-tab="divisas">Divisas</button>
-    <button class="tab" data-tab="commodities">Commodities</button>
-    <button class="tab" data-tab="acereras">Acereras</button>
-    <button class="tab" data-tab="macro">Macro EE. UU.</button>
-    <button class="tab" data-tab="construccion">Construcción</button>
-    <button class="tab" data-tab="chatarra">Chatarra</button>
-    <button class="tab" data-tab="productores">Productores</button>
-    <button class="tab" data-tab="swap">Coberturas</button>
-    <button class="tab" data-tab="archivos">Archivos</button>
-  </div>
+<div style="max-width:1180px;margin:0 auto;padding:0 12px;display:flex;gap:4px;">
+<button class="tab activo" data-tab="divisas">Divisas</button>
+<button class="tab" data-tab="commodities">Commodities</button>
+<button class="tab" data-tab="acereras">Acereras</button>
+<button class="tab" data-tab="macro">Macro EE. UU.</button>
+<button class="tab" data-tab="construccion">Construcción</button>
+<button class="tab" data-tab="chatarra">Chatarra</button>
+<button class="tab" data-tab="productores">Productores</button>
+<button class="tab" data-tab="swap">Coberturas</button>
+<button class="tab" data-tab="archivos">Archivos</button>
+</div>
 </nav>
-
 <div id="aviso"></div>
-
 <main style="max-width:1180px;margin:0 auto;padding:22px 20px 60px;">
-  <section id="sec-divisas" class="activa" data-screen-label="Divisas">
-    <div class="seccion-titulo">Tipos de cambio — últimos valores</div>
-    <div class="cards" id="cards-divisas"></div>
-    <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf">
-      <div class="panel ancho">
-        <div class="ctrl">
-          <label for="sel-moneda">Divisa:</label>
-          <select id="sel-moneda"></select>
-          <span style="font-size:12px;color:#9aa0a6;">unidades por 1 USD</span>
-        </div>
-        <div class="lienzo alto"><canvas id="c-fx"></canvas></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="sec-commodities" data-screen-label="Commodities">
-    <div class="seccion-titulo">Commodities y mercado — últimos valores</div>
-    <div class="cards" id="cards-commodities"></div>
-    <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf">
-      <div class="panel"><h3>Henry Hub — futuro front-month NG=F ($/MMBtu)</h3><div class="lienzo"><canvas id="c-hh"></canvas></div></div>
-      <div class="panel"><h3>Petróleo — WTI vs. Brent ($/bbl)</h3><div class="lienzo"><canvas id="c-oil"></canvas></div></div>
-      <div class="panel ancho"><h3>S&amp;P 500</h3><div class="lienzo"><canvas id="c-sp"></canvas></div></div>
-    </div>
-  </section>
-
-  <section id="sec-acereras" data-screen-label="Acereras">
-    <div class="seccion-titulo">Acereras — mundial vs. EE. UU.</div>
-    <div class="cards" id="cards-acereras"></div>
-    <div class="seccion-titulo">Precios por acción — últimos valores</div>
-    <div class="cards" id="cards-acereras-precios"></div>
-    <div class="seccion-titulo">Evolución del precio</div>
-    <div class="grid-graf">
-      <div class="panel ancho">
-        <div class="ctrl">
-          <label for="sel-accion">Acción:</label>
-          <select id="sel-accion"></select>
-          <span style="font-size:12px;color:#9aa0a6;">precio de cierre (USD)</span>
-        </div>
-        <div class="lienzo alto"><canvas id="c-ac-precio"></canvas></div>
-      </div>
-    </div>
-    <div class="seccion-titulo">Evolución y correlación</div>
-    <div class="grid-graf">
-      <div class="panel ancho"><h3>Índices de acereras — desempeño relativo (base 100 = 2021)</h3><div class="lienzo alto"><canvas id="c-ac-idx"></canvas></div></div>
-      <div class="panel ancho"><h3>Correlación móvil 13 semanas (rendimientos semanales)</h3><div class="lienzo"><canvas id="c-ac-corr"></canvas></div></div>
-    </div>
-    <div id="ac-cobertura" class="cobertura"></div>
-  </section>
-
-  <section id="sec-macro" data-screen-label="Macro EE. UU.">
-    <div class="seccion-titulo">Macro EE. UU. — últimos valores</div>
-    <div class="cards" id="cards-macro"></div>
-    <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf" id="graf-macro"></div>
-  </section>
-
-  <section id="sec-construccion" data-screen-label="Construcción">
-    <div class="seccion-titulo">Construcción EE. UU. — últimos valores</div>
-    <div class="cards" id="cards-construccion"></div>
-    <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf" id="graf-construccion"></div>
-    <div class="cobertura">Indicadores líderes de demanda de acero, vía FRED (datos del U.S. Census Bureau). Housing Starts: viviendas iniciadas, miles de unidades anualizadas (SAAR). Construction Spending: gasto total en construcción, anualizado (SAAR).</div>
-  </section>
-
-  <section id="sec-chatarra" data-screen-label="Chatarra">
-    <div class="seccion-titulo">Chatarra ferrosa EE. UU. — últimos valores</div>
-    <div class="cards" id="cards-chatarra"></div>
-    <div class="seccion-titulo">Evolución</div>
-    <div class="grid-graf" id="graf-chatarra"></div>
-    <div class="cobertura">Índices de precio del PPI (BLS), vía FRED. Son índices base 1982=100, <b>no</b> $/tonelada: el nivel no es comparable entre grados, pero el <b>% mensual</b> sí refleja el movimiento del mercado. Grados: HMS (Heavy Melting), Bundles (chatarra prime tipo busheling), Shredded (fragmentada) y el agregado de chatarra al carbono. Mensuales, con ~2 semanas de rezago. El número exacto en $/ton es data propietaria (Fastmarkets).</div>
-  </section>
-
-  <section id="sec-productores" data-screen-label="Productores">
-    <div class="seccion-titulo">Top 10 países productores de acero — últimos valores</div>
-    <div class="cards" id="cards-productores"></div>
-    <div class="seccion-titulo">
-      <span>Ranking <span id="prod-periodo" style="color:#9aa0a6;font-weight:400;"></span></span>
-      <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;">
-        <select id="prod-mes" class="prod-sel"></select>
-        <span id="prod-toggle" style="display:inline-flex;border:1px solid #3a3a42;border-radius:8px;overflow:hidden;">
-          <button class="prod-btn" data-metrica="ytd">YTD (acumulado)</button>
-          <button class="prod-btn" data-metrica="mes">Mes</button>
-        </span>
-      </span>
-    </div>
-    <div class="panel ancho"><div class="lienzo alto"><canvas id="c-productores"></canvas></div></div>
-    <div class="cobertura" id="prod-cobertura">World Steel Association (worldsteel), comunicado mensual de producción de acero crudo. Barras en millones de toneladas (Mt); <b>verde</b> si creció y <b>rojo</b> si cayó frente al año previo. China domina por mucho (más de la mitad del total mundial), así que aplasta la escala. Mensuales, ~3-4 semanas de rezago.</div>
-  </section>
-
-  <section id="sec-swap" data-screen-label="Coberturas">
-    <div class="seccion-titulo">Fair value del swap — Pro Energy</div>
-    <div class="grid-graf">
-      <div class="panel">
-        <h3>Curva forward HSC ($/MMBtu) <span id="sw-fuente" style="font-size:11px;font-weight:400;color:#9aa0a6;"></span></h3>
-        <div id="swap-months" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px;"></div>
-      </div>
-      <div class="panel">
-        <h3>Modelo &amp; oferta</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Hedge ratio (β)</label>
-            <input type="number" id="sw-beta" step="0.0001" value="1.0436" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Intercepto ($/MMBtu)</label>
-            <input type="number" id="sw-int" step="0.001" value="0.0525" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volumen mensual (MMBtu)</label>
-            <input type="number" id="sw-vol" step="100" value="10000" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Margen objetivo ($/MMBtu)</label>
-            <input type="number" id="sw-margin" step="0.005" value="0.05" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Precio de swap cotizado ($/MMBtu)</label>
-          <input type="number" id="sw-price" step="0.001" value="2.879" class="prod-sel" style="width:100%;">
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Duración del strip (meses)</label>
-          <input type="number" id="sw-nmonths" min="1" max="12" value="7" class="prod-sel" style="width:100%;">
-        </div>
-      </div>
-    </div>
-
-    <div class="seccion-titulo">Resultado</div>
-    <div class="panel ancho" style="margin-bottom:16px;">
-      <div id="sw-verdict" style="font-size:16px;margin-bottom:14px;"></div>
-      <div class="cards" style="grid-template-columns:repeat(3,1fr);">
-        <div class="card"><div class="nombre">Fair value WMC ponderado</div><div class="valor" id="sw-fair">—</div></div>
-        <div class="card"><div class="nombre">Margen implícito del swap</div><div class="valor" id="sw-implied">—</div></div>
-        <div class="card"><div class="nombre">Diferencia vs. objetivo</div><div class="valor" id="sw-delta">—</div></div>
-      </div>
-    </div>
-
-    <div class="panel ancho">
-      <h3>Detalle por mes</h3>
-      <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;">
-        <thead>
-          <tr style="color:#9aa0a6;text-align:right;">
-            <th style="text-align:left;padding:6px 8px;">Mes</th>
-            <th style="padding:6px 8px;">HSC forward</th>
-            <th style="padding:6px 8px;">WMC fair value</th>
-            <th style="padding:6px 8px;">Swap cotizado</th>
-            <th style="padding:6px 8px;">Volumen</th>
-            <th style="padding:6px 8px;">Costo fair value</th>
-            <th style="padding:6px 8px;">Costo swap</th>
-          </tr>
-        </thead>
-        <tbody id="sw-tbody"></tbody>
-      </table>
-      </div>
-    </div>
-    <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
-
-    <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
-    <div class="grid-graf">
-      <div class="panel">
-        <h3>Parámetros de la opción</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Forward ($/MMBtu)</label>
-            <input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad implícita (%)</label>
-            <input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike put (piso)</label>
-            <input type="number" id="b76-kput" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike call (techo)</label>
-            <input type="number" id="b76-kcall" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento</label>
-            <input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%)</label>
-            <input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Primas teóricas</h3>
-        <div class="cards" style="grid-template-columns:1fr 1fr;">
-          <div class="card"><div class="nombre">Prima put (piso)</div><div class="valor" id="b76-pput" style="font-size:18px;">—</div></div>
-          <div class="card"><div class="nombre">Prima call (techo)</div><div class="valor" id="b76-pcall" style="font-size:18px;">—</div></div>
-        </div>
-        <div class="cards" style="grid-template-columns:1fr;margin-top:10px;">
-          <div class="card"><div class="nombre">Diferencia (put − call)</div><div class="valor" id="b76-diff" style="font-size:18px;">—</div></div>
-        </div>
-        <div class="cobertura" id="b76-veredicto">—</div>
-      </div>
-    </div>
-    <div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
-
-    <div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
-    <div class="grid-graf">
-      <div class="panel">
-        <h3>Parámetros de cobertura</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volumen (MMBtu/mes)</label>
-            <input type="number" id="cp-vol" value="10000" step="500" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Duración (meses)</label>
-            <input type="number" id="cp-nmeses" value="7" min="1" max="12" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Precio de referencia (spot actual, $/MMBtu)</label>
-          <input type="number" id="cp-spot" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Swap ($/MMBtu)</label>
-            <input type="number" id="cp-swap" value="2.879" step="0.001" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Collar piso</label>
-            <input type="number" id="cp-floor" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Collar techo</label>
-            <input type="number" id="cp-cap" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">HSC vencimiento — mín</label>
-            <input type="range" id="cp-rmin" min="1" max="5" step="0.1" value="1.5" style="width:100%;accent-color:#FF7A18;">
-            <div style="text-align:right;font-size:11px;color:#9aa0a6;">$<span id="cp-rminlbl">1.50</span></div>
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">HSC vencimiento — máx</label>
-            <input type="range" id="cp-rmax" min="1" max="6" step="0.1" value="4.5" style="width:100%;accent-color:#FF7A18;">
-            <div style="text-align:right;font-size:11px;color:#9aa0a6;">$<span id="cp-rmaxlbl">4.50</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="ctrl" style="justify-content:center;">
-          <span id="cp-toggle" style="display:inline-flex;border:1px solid #3a3a42;border-radius:8px;overflow:hidden;">
-            <button class="prod-btn" data-modo="none">Sin cobertura</button>
-            <button class="prod-btn" data-modo="swap">Swap</button>
-            <button class="prod-btn" data-modo="collar">Collar</button>
-          </span>
-        </div>
-        <div class="lienzo alto"><canvas id="c-swapcollar"></canvas></div>
-      </div>
-    </div>
-
-    <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:14px;">
-      <div class="card"><div class="nombre">Costo máximo</div><div class="valor" id="cp-maxloss" style="font-size:18px;">—</div></div>
-      <div class="card"><div class="nombre">HSC breakeven</div><div class="valor" id="cp-breakeven" style="font-size:18px;">—</div></div>
-      <div class="card"><div class="nombre">Techo de costo efectivo</div><div class="valor" id="cp-ceiling" style="font-size:18px;">—</div></div>
-      <div class="card"><div class="nombre">Prima total</div><div class="valor" id="cp-premium" style="font-size:18px;">—</div></div>
-    </div>
-
-    <div class="panel ancho" style="margin-top:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <h3 style="margin:0;">Escenarios</h3>
-        <button class="btn ghost" id="cp-download" style="font-size:12px;padding:6px 12px;">⬇ Descargar .csv</button>
-      </div>
-      <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;">
-        <thead>
-          <tr style="color:#9aa0a6;text-align:right;">
-            <th style="text-align:left;padding:6px 8px;">Escenario</th>
-            <th style="padding:6px 8px;">HSC</th>
-            <th style="padding:6px 8px;">Costo sin cobertura</th>
-            <th style="padding:6px 8px;">Costo con cobertura</th>
-            <th style="padding:6px 8px;">Diferencia</th>
-          </tr>
-        </thead>
-        <tbody id="cp-tbody"></tbody>
-      </table>
-      </div>
-    </div>
-    <div class="cobertura">El costo se muestra vs. el spot de referencia. Un HSC más alto es desfavorable (pagas más gas); el swap fija el costo sin importar el mercado, el collar lo acota dentro de un rango pero deja participar del precio de mercado en la zona media. Se asume swap y collar zero-cost (sin prima explícita).</div>
-
-    <div class="seccion-titulo" style="margin-top:34px;">Comparación — fair value vs. swap/collar</div>
-    <div class="panel ancho">
-      <p style="font-size:12.5px;color:#9aa0a6;margin:0 0 12px;">Compara el costo total de las dos simulaciones de arriba para el mismo horizonte, y marca cuál sale más barata.</p>
-      <div class="cards" id="cmp-cards" style="grid-template-columns:repeat(4,1fr);">
-        <div class="card"><div class="nombre">Costo — fair value WMC</div><div class="valor" id="cmp-fair" style="font-size:17px;">—</div></div>
-        <div class="card"><div class="nombre">Costo — swap cotizado</div><div class="valor" id="cmp-swap" style="font-size:17px;">—</div></div>
-        <div class="card"><div class="nombre">Costo — sin cobertura</div><div class="valor" id="cmp-none" style="font-size:17px;">—</div></div>
-        <div class="card"><div class="nombre">Costo — collar</div><div class="valor" id="cmp-collar" style="font-size:17px;">—</div></div>
-      </div>
-      <div class="cobertura" id="cmp-veredicto" style="margin-top:10px;">—</div>
-      <div class="cobertura" style="color:#9aa0a6;">"Fair value WMC" y "Swap cotizado" vienen de la calculadora de arriba (usan su propio volumen y meses). "Sin cobertura" y "Collar" vienen del comparador de escenarios, evaluados en el precio de referencia (spot) que configuraste ahí. Como cada calculadora tiene sus propios supuestos de volumen/horizonte, esto es una comparación de órdenes de magnitud, no una suma exacta del mismo contrato.</div>
-    </div>
-
-  </section>
-
-  <section id="sec-archivos" data-screen-label="Archivos">
-    <div class="seccion-titulo">Descargas</div>
-    <div class="archivos">
-      <div class="archivo">
-        <h4>Excel completo</h4>
-        <p>Todas las series con formato: resumen, datos diarios, inflación y gráficas por divisa.</p>
-        <a class="btn" id="dl-excel" href="resultados/mercados_reciente.xlsx">⬇ Descargar .xlsx</a>
-      </div>
-      <div class="archivo">
-        <h4>Panel general (imagen)</h4>
-        <p>Henry Hub, petróleo, S&amp;P 500 e inflación en una sola imagen.</p>
-        <a class="btn ghost" href="resultados/graficos_reciente.png" target="_blank">Ver PNG</a>
-      </div>
-      <div class="archivo">
-        <h4>Divisas (imagen)</h4>
-        <p>Las 10 divisas frente al dólar en un panel de imagen.</p>
-        <a class="btn ghost" href="resultados/graficos_divisas_reciente.png" target="_blank">Ver PNG</a>
-      </div>
-    </div>
-  </section>
+<section id="sec-divisas" class="activa" data-screen-label="Divisas">
+<div class="seccion-titulo">Tipos de cambio — últimos valores</div>
+<div class="cards" id="cards-divisas"></div>
+<div class="seccion-titulo">Evolución</div>
+<div class="grid-graf">
+<div class="panel ancho">
+<div class="ctrl">
+<label for="sel-moneda">Divisa:</label>
+<select id="sel-moneda"></select>
+<span style="font-size:12px;color:#9aa0a6;">unidades por 1 USD</span>
+</div>
+<div class="lienzo alto"><canvas id="c-fx"></canvas></div>
+</div>
+</div>
+</section>
+<section id="sec-commodities" data-screen-label="Commodities">
+<div class="seccion-titulo">Commodities y mercado — últimos valores</div>
+<div class="cards" id="cards-commodities"></div>
+<div class="seccion-titulo">Evolución</div>
+<div class="grid-graf">
+<div class="panel"><h3>Henry Hub — futuro front-month NG=F ($/MMBtu)</h3><div class="lienzo"><canvas id="c-hh"></canvas></div></div>
+<div class="panel"><h3>Petróleo — WTI vs. Brent ($/bbl)</h3><div class="lienzo"><canvas id="c-oil"></canvas></div></div>
+<div class="panel ancho"><h3>S&amp;P 500</h3><div class="lienzo"><canvas id="c-sp"></canvas></div></div>
+</div>
+</section>
+<section id="sec-acereras" data-screen-label="Acereras">
+<div class="seccion-titulo">Acereras — mundial vs. EE. UU.</div>
+<div class="cards" id="cards-acereras"></div>
+<div class="seccion-titulo">Precios por acción — últimos valores</div>
+<div class="cards" id="cards-acereras-precios"></div>
+<div class="seccion-titulo">Evolución del precio</div>
+<div class="grid-graf">
+<div class="panel ancho">
+<div class="ctrl">
+<label for="sel-accion">Acción:</label>
+<select id="sel-accion"></select>
+<span style="font-size:12px;color:#9aa0a6;">precio de cierre (USD)</span>
+</div>
+<div class="lienzo alto"><canvas id="c-ac-precio"></canvas></div>
+</div>
+</div>
+<div class="seccion-titulo">Evolución y correlación</div>
+<div class="grid-graf">
+<div class="panel ancho"><h3>Índices de acereras — desempeño relativo (base 100 = 2021)</h3><div class="lienzo alto"><canvas id="c-ac-idx"></canvas></div></div>
+<div class="panel ancho"><h3>Correlación móvil 13 semanas (rendimientos semanales)</h3><div class="lienzo"><canvas id="c-ac-corr"></canvas></div></div>
+</div>
+<div id="ac-cobertura" class="cobertura"></div>
+</section>
+<section id="sec-macro" data-screen-label="Macro EE. UU.">
+<div class="seccion-titulo">Macro EE. UU. — últimos valores</div>
+<div class="cards" id="cards-macro"></div>
+<div class="seccion-titulo">Evolución</div>
+<div class="grid-graf" id="graf-macro"></div>
+</section>
+<section id="sec-construccion" data-screen-label="Construcción">
+<div class="seccion-titulo">Construcción EE. UU. — últimos valores</div>
+<div class="cards" id="cards-construccion"></div>
+<div class="seccion-titulo">Evolución</div>
+<div class="grid-graf" id="graf-construccion"></div>
+<div class="cobertura">Indicadores líderes de demanda de acero, vía FRED (datos del U.S. Census Bureau). Housing Starts: viviendas iniciadas, miles de unidades anualizadas (SAAR). Construction Spending: gasto total en construcción, anualizado (SAAR).</div>
+</section>
+<section id="sec-chatarra" data-screen-label="Chatarra">
+<div class="seccion-titulo">Chatarra ferrosa EE. UU. — últimos valores</div>
+<div class="cards" id="cards-chatarra"></div>
+<div class="seccion-titulo">Evolución</div>
+<div class="grid-graf" id="graf-chatarra"></div>
+<div class="cobertura">Índices de precio del PPI (BLS), vía FRED. Son índices base 1982=100, <b>no</b> $/tonelada: el nivel no es comparable entre grados, pero el <b>% mensual</b> sí refleja el movimiento del mercado. Grados: HMS (Heavy Melting), Bundles (chatarra prime tipo busheling), Shredded (fragmentada) y el agregado de chatarra al carbono. Mensuales, con ~2 semanas de rezago. El número exacto en $/ton es data propietaria (Fastmarkets).</div>
+</section>
+<section id="sec-productores" data-screen-label="Productores">
+<div class="seccion-titulo">Top 10 países productores de acero — últimos valores</div>
+<div class="cards" id="cards-productores"></div>
+<div class="seccion-titulo">
+<span>Ranking <span id="prod-periodo" style="color:#9aa0a6;font-weight:400;"></span></span>
+<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;">
+<select id="prod-mes" class="prod-sel"></select>
+<span id="prod-toggle" style="display:inline-flex;border:1px solid #3a3a42;border-radius:8px;overflow:hidden;">
+<button class="prod-btn" data-metrica="ytd">YTD (acumulado)</button>
+<button class="prod-btn" data-metrica="mes">Mes</button>
+</span>
+</span>
+</div>
+<div class="panel ancho"><div class="lienzo alto"><canvas id="c-productores"></canvas></div></div>
+<div class="cobertura" id="prod-cobertura">World Steel Association (worldsteel), comunicado mensual de producción de acero crudo. Barras en millones de toneladas (Mt); <b>verde</b> si creció y <b>rojo</b> si cayó frente al año previo. China domina por mucho (más de la mitad del total mundial), así que aplasta la escala. Mensuales, ~3-4 semanas de rezago.</div>
+</section>
+<section id="sec-swap" data-screen-label="Coberturas">
+<div class="seccion-titulo">Fair value del swap — Pro Energy</div>
+<div class="grid-graf">
+<div class="panel">
+<h3>Curva forward HSC ($/MMBtu) <span id="sw-fuente" style="font-size:11px;font-weight:400;color:#9aa0a6;"></span></h3>
+<div id="swap-months" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px;"></div>
+</div>
+<div class="panel">
+<h3>Modelo &amp; oferta</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Hedge ratio (β)</label>
+<input type="number" id="sw-beta" step="0.0001" value="1.0436" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Intercepto ($/MMBtu)</label>
+<input type="number" id="sw-int" step="0.001" value="0.0525" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volumen mensual (MMBtu)</label>
+<input type="number" id="sw-vol" step="100" value="10000" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Margen objetivo ($/MMBtu)</label>
+<input type="number" id="sw-margin" step="0.005" value="0.05" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Precio de swap cotizado ($/MMBtu)</label>
+<input type="number" id="sw-price" step="0.001" value="2.879" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Duración del strip (meses)</label>
+<input type="number" id="sw-nmonths" min="1" max="12" value="7" class="prod-sel" style="width:100%;">
+</div>
+</div>
+</div>
+<div class="seccion-titulo">Resultado</div>
+<div class="panel ancho" style="margin-bottom:16px;">
+<div id="sw-verdict" style="font-size:16px;margin-bottom:14px;"></div>
+<div class="cards" style="grid-template-columns:repeat(3,1fr);">
+<div class="card"><div class="nombre">Fair value WMC ponderado</div><div class="valor" id="sw-fair">—</div></div>
+<div class="card"><div class="nombre">Margen implícito del swap</div><div class="valor" id="sw-implied">—</div></div>
+<div class="card"><div class="nombre">Diferencia vs. objetivo</div><div class="valor" id="sw-delta">—</div></div>
+</div>
+</div>
+<div class="panel ancho">
+<h3>Detalle por mes</h3>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;">
+<thead>
+<tr style="color:#9aa0a6;text-align:right;">
+<th style="text-align:left;padding:6px 8px;">Mes</th>
+<th style="padding:6px 8px;">HSC forward</th>
+<th style="padding:6px 8px;">WMC fair value</th>
+<th style="padding:6px 8px;">Swap cotizado</th>
+<th style="padding:6px 8px;">Volumen</th>
+<th style="padding:6px 8px;">Costo fair value</th>
+<th style="padding:6px 8px;">Costo swap</th>
+</tr>
+</thead>
+<tbody id="sw-tbody"></tbody>
+</table>
+</div>
+</div>
+<div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
+<div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
+<div class="grid-graf">
+<div class="panel">
+<h3>Parámetros de la opción</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Forward ($/MMBtu)</label>
+<input type="number" id="b76-fwd" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volatilidad implícita (%)</label>
+<input type="number" id="b76-vol" value="45" step="1" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike put (piso)</label>
+<input type="number" id="b76-kput" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Strike call (techo)</label>
+<input type="number" id="b76-kcall" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Días al vencimiento</label>
+<input type="number" id="b76-dias" value="60" step="1" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Tasa libre de riesgo (%)</label>
+<input type="number" id="b76-r" value="4.5" step="0.1" class="prod-sel" style="width:100%;">
+</div>
+</div>
+</div>
+<div class="panel">
+<h3>Primas teóricas</h3>
+<div class="cards" style="grid-template-columns:1fr 1fr;">
+<div class="card"><div class="nombre">Prima put (piso)</div><div class="valor" id="b76-pput" style="font-size:18px;">—</div></div>
+<div class="card"><div class="nombre">Prima call (techo)</div><div class="valor" id="b76-pcall" style="font-size:18px;">—</div></div>
+</div>
+<div class="cards" style="grid-template-columns:1fr;margin-top:10px;">
+<div class="card"><div class="nombre">Diferencia (put − call)</div><div class="valor" id="b76-diff" style="font-size:18px;">—</div></div>
+</div>
+<div class="cobertura" id="b76-veredicto">—</div>
+</div>
+</div>
+<div class="cobertura" style="color:#9aa0a6;">Modelo Black-76 para opciones sobre futuros. La volatilidad implícita NO se calcula aquí — tienes que traerla de una fuente real (settlement de opciones de Henry Hub en CME) para que el resultado sea confiable; el valor precargado es solo un ejemplo ilustrativo. Si "Diferencia" está cerca de $0, el collar cotizado es aproximadamente costo cero; si el put teórico es mayor que el call, el bróker te debería una prima neta (o el collar no es realmente zero-cost).</div>
+<div class="seccion-titulo" style="margin-top:34px;">Swap vs. Collar — comparador de escenarios</div>
+<div class="grid-graf">
+<div class="panel">
+<h3>Parámetros de cobertura</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Volumen (MMBtu/mes)</label>
+<input type="number" id="cp-vol" value="10000" step="500" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Duración (meses)</label>
+<input type="number" id="cp-nmeses" value="7" min="1" max="12" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Precio de referencia (spot actual, $/MMBtu)</label>
+<input type="number" id="cp-spot" value="2.90" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Swap ($/MMBtu)</label>
+<input type="number" id="cp-swap" value="2.879" step="0.001" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Collar piso</label>
+<input type="number" id="cp-floor" value="2.50" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Collar techo</label>
+<input type="number" id="cp-cap" value="3.25" step="0.01" class="prod-sel" style="width:100%;">
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">HSC vencimiento — mín</label>
+<input type="range" id="cp-rmin" min="1" max="5" step="0.1" value="1.5" style="width:100%;accent-color:#FF7A18;">
+<div style="text-align:right;font-size:11px;color:#9aa0a6;">$<span id="cp-rminlbl">1.50</span></div>
+</div>
+<div>
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">HSC vencimiento — máx</label>
+<input type="range" id="cp-rmax" min="1" max="6" step="0.1" value="4.5" style="width:100%;accent-color:#FF7A18;">
+<div style="text-align:right;font-size:11px;color:#9aa0a6;">$<span id="cp-rmaxlbl">4.50</span></div>
+</div>
+</div>
+</div>
+<div class="panel">
+<div class="ctrl" style="justify-content:center;">
+<span id="cp-toggle" style="display:inline-flex;border:1px solid #3a3a42;border-radius:8px;overflow:hidden;">
+<button class="prod-btn" data-modo="none">Sin cobertura</button>
+<button class="prod-btn" data-modo="swap">Swap</button>
+<button class="prod-btn" data-modo="collar">Collar</button>
+</span>
+</div>
+<div class="lienzo alto"><canvas id="c-swapcollar"></canvas></div>
+</div>
+</div>
+<div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:14px;">
+<div class="card"><div class="nombre">Costo máximo</div><div class="valor" id="cp-maxloss" style="font-size:18px;">—</div></div>
+<div class="card"><div class="nombre">HSC breakeven</div><div class="valor" id="cp-breakeven" style="font-size:18px;">—</div></div>
+<div class="card"><div class="nombre">Techo de costo efectivo</div><div class="valor" id="cp-ceiling" style="font-size:18px;">—</div></div>
+<div class="card"><div class="nombre">Prima total</div><div class="valor" id="cp-premium" style="font-size:18px;">—</div></div>
+</div>
+<div class="panel ancho" style="margin-top:14px;">
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+<h3 style="margin:0;">Escenarios</h3>
+<button class="btn ghost" id="cp-download" style="font-size:12px;padding:6px 12px;">⬇ Descargar .csv</button>
+</div>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;">
+<thead>
+<tr style="color:#9aa0a6;text-align:right;">
+<th style="text-align:left;padding:6px 8px;">Escenario</th>
+<th style="padding:6px 8px;">HSC</th>
+<th style="padding:6px 8px;">Costo sin cobertura</th>
+<th style="padding:6px 8px;">Costo con cobertura</th>
+<th style="padding:6px 8px;">Diferencia</th>
+</tr>
+</thead>
+<tbody id="cp-tbody"></tbody>
+</table>
+</div>
+</div>
+<div class="cobertura">El costo se muestra vs. el spot de referencia. Un HSC más alto es desfavorable (pagas más gas); el swap fija el costo sin importar el mercado, el collar lo acota dentro de un rango pero deja participar del precio de mercado en la zona media. Se asume swap y collar zero-cost (sin prima explícita).</div>
+<div class="seccion-titulo" style="margin-top:34px;">Comparación — fair value vs. swap/collar</div>
+<div class="panel ancho">
+<p style="font-size:12.5px;color:#9aa0a6;margin:0 0 12px;">Compara el costo total de las dos simulaciones de arriba para el mismo horizonte, y marca cuál sale más barata.</p>
+<div class="cards" id="cmp-cards" style="grid-template-columns:repeat(4,1fr);">
+<div class="card"><div class="nombre">Costo — fair value WMC</div><div class="valor" id="cmp-fair" style="font-size:17px;">—</div></div>
+<div class="card"><div class="nombre">Costo — swap cotizado</div><div class="valor" id="cmp-swap" style="font-size:17px;">—</div></div>
+<div class="card"><div class="nombre">Costo — sin cobertura</div><div class="valor" id="cmp-none" style="font-size:17px;">—</div></div>
+<div class="card"><div class="nombre">Costo — collar</div><div class="valor" id="cmp-collar" style="font-size:17px;">—</div></div>
+</div>
+<div class="cobertura" id="cmp-veredicto" style="margin-top:10px;">—</div>
+<div class="cobertura" style="color:#9aa0a6;">"Fair value WMC" y "Swap cotizado" vienen de la calculadora de arriba (usan su propio volumen y meses). "Sin cobertura" y "Collar" vienen del comparador de escenarios, evaluados en el precio de referencia (spot) que configuraste ahí. Como cada calculadora tiene sus propios supuestos de volumen/horizonte, esto es una comparación de órdenes de magnitud, no una suma exacta del mismo contrato.</div>
+</div>
+</section>
+<section id="sec-archivos" data-screen-label="Archivos">
+<div class="seccion-titulo">Descargas</div>
+<div class="archivos">
+<div class="archivo">
+<h4>Excel completo</h4>
+<p>Todas las series con formato: resumen, datos diarios, inflación y gráficas por divisa.</p>
+<a class="btn" id="dl-excel" href="resultados/mercados_reciente.xlsx">⬇ Descargar .xlsx</a>
+</div>
+<div class="archivo">
+<h4>Panel general (imagen)</h4>
+<p>Henry Hub, petróleo, S&amp;P 500 e inflación en una sola imagen.</p>
+<a class="btn ghost" href="resultados/graficos_reciente.png" target="_blank">Ver PNG</a>
+</div>
+<div class="archivo">
+<h4>Divisas (imagen)</h4>
+<p>Las 10 divisas frente al dólar en un panel de imagen.</p>
+<a class="btn ghost" href="resultados/graficos_divisas_reciente.png" target="_blank">Ver PNG</a>
+</div>
+</div>
+</section>
 </main>
-
 <footer id="footer" style="max-width:1180px;margin:0 auto;padding:8px 20px 40px;color:#9aa0a6;font-size:12px;"></footer>
 <script>
 window.PANEL_INIT();
