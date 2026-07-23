@@ -223,12 +223,24 @@ select:focus{outline:none;border-color:var(--naranja);}
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
 <div>
 <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Hedge ratio (β)</label>
-<input type="number" id="sw-beta" step="0.0001" value="1.0436" class="prod-sel" style="width:100%;">
+<input type="number" id="sw-beta" step="0.0001" value="1.0275" class="prod-sel" style="width:100%;">
 </div>
 <div>
 <label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Intercepto ($/MMBtu)</label>
-<input type="number" id="sw-int" step="0.001" value="0.0525" class="prod-sel" style="width:100%;">
+<input type="number" id="sw-int" step="0.001" value="0.0758" class="prod-sel" style="width:100%;">
 </div>
+</div>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Standard Error de la regresión ($/MMBtu)</label>
+<input type="number" id="sw-see" step="0.0001" value="0.0932" class="prod-sel" style="width:100%;">
+</div>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:6px;">Nivel de tolerancia (margen objetivo = k × Standard Error)</label>
+<span id="sw-kbtns" style="display:inline-flex;border:1px solid #3a3a42;border-radius:8px;overflow:hidden;">
+<button class="prod-btn sw-kbtn activo" data-k="1">k=1 · ~68%</button>
+<button class="prod-btn sw-kbtn" data-k="1.65">k=1.65 · ~90%</button>
+<button class="prod-btn sw-kbtn" data-k="2">k=2 · ~95%</button>
+</span>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
 <div>
@@ -236,8 +248,8 @@ select:focus{outline:none;border-color:var(--naranja);}
 <input type="number" id="sw-vol" step="100" value="10000" class="prod-sel" style="width:100%;">
 </div>
 <div>
-<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Margen objetivo ($/MMBtu)</label>
-<input type="number" id="sw-margin" step="0.005" value="0.05" class="prod-sel" style="width:100%;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Margen objetivo ($/MMBtu) <span style="font-style:italic;">— auto, editable</span></label>
+<input type="number" id="sw-margin" step="0.005" value="0.093" class="prod-sel" style="width:100%;">
 </div>
 </div>
 <div style="margin-bottom:12px;">
@@ -278,7 +290,7 @@ select:focus{outline:none;border-color:var(--naranja);}
 </table>
 </div>
 </div>
-<div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9695). El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
+<div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9850). El margen objetivo se deriva del Standard Error de esa misma regresión (k × SE): k=1 tolera hasta una desviación estándar de ruido normal del modelo (~68% de los casos históricos), k=1.65 ~90%, k=2 ~95% — entre más alto el k, menos falsas alarmas pero más lento para detectar un margen real que te esté cobrando el dealer. El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
 <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
 <div class="grid-graf">
 <div class="panel">
