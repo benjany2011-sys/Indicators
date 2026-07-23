@@ -303,7 +303,70 @@ def obtener_henry_hub():
     return df.reset_index(drop=True)
 
 
-def obtener_curva_forward_hh(n_meses=7):
+def obtener_volatilidad_hh(diario, ventana=30):
+    """
+    Volatilidad histórica (realizada) de Henry Hub, anualizada, calculada con
+    los retornos logarítmicos diarios de los últimos `ventana` días hábiles.
+
+    OJO: esto NO es lo mismo que la volatilidad implícita de las opciones de
+    CME (que es lo que el mercado está pagando HOY por la incertidumbre
+    futura). Es un sustituto automático y gratuito para cuando no se tiene
+    acceso a datos de opciones: mide qué tan movido ha estado el precio
+    recientemente, no las expectativas del mercado de opciones. Es razonable
+    para tener un número de referencia en el panel, pero si algún día
+    consigues la volatilidad implícita real (CME CVOL, o directo de un
+    broker), esa es preferible y hay que reemplazar el campo a mano.
+    """
+    import numpy as np
+    serie = diario.dropna(subset=[COL_HH])[COL_HH]
+    if len(serie) < ventana + 5:
+        return None
+    log_ret = np.log(serie / serie.shift(1)).dropna()
+    vol_diaria = log_ret.tail(ventana).std()
+    if pd.isna(vol_diaria):
+        return None
+    vol_anual_pct = float(vol_diaria) * (252 ** 0.5) * 100
+    return round(vol_anual_pct, 1)
+
+
+def obtener_tasa_libre_riesgo():
+    """
+    Tasa libre de riesgo de corto plazo: Treasury a 3 meses (FRED:DGS3MO).
+    Uso el último dato disponible. Sirve como aproximación razonable para
+    opciones de gas natural de 60-90 días — a ese plazo el resultado del
+    Black-76 casi no es sensible a esta tasa, así que no hace falta afinar
+    el vencimiento exacto.
+    """
+    try:
+        df = obtener_fred("DGS3MO", observation_start=(dt.date.today() - dt.timedelta(days=30)).isoformat())
+        df = df.dropna(subset=["valor"])
+        if df.empty:
+            return None
+        return round(float(df.iloc[-1]["valor"]), 2)
+    except Exception as e:
+        log(f"  Aviso: tasa libre de riesgo (FRED:DGS3MO) falló ({e}); se omite.")
+        return None
+
+
+def _tercer_dia_habil_antes(fecha):
+    """
+    Cuenta 3 días hábiles (lunes-viernes) hacia atrás desde `fecha`, sin
+    considerar feriados de mercado — es la aproximación que uso para el
+    vencimiento de las opciones de Henry Hub (la regla real de CME es 3 días
+    hábiles antes del primer día del mes de entrega del futuro subyacente).
+    Para fechas de decisión (¿cubro o no?) es suficientemente precisa; para
+    liquidar un contrato real, confirma la fecha exacta en CME.
+    """
+    d = fecha
+    contados = 0
+    while contados < 3:
+        d = d - dt.timedelta(days=1)
+        if d.weekday() < 5:
+            contados += 1
+    return d
+
+
+
     """
     Curva forward de Henry Hub (NYMEX) para los próximos n_meses contratos
     mensuales, vía Yahoo (yfinance). Uso los tickers de mes específico
@@ -342,7 +405,12 @@ def obtener_curva_forward_hh(n_meses=7):
             hist = tk.history(period="5d")
             if not hist.empty:
                 precio = round(float(hist["Close"].iloc[-1]), 3)
-                curva.append({"mes": etiqueta, "ticker": ticker, "precio": precio})
+                primer_dia_mes = dt.date(anio, mes, 1)
+                fecha_venc = _tercer_dia_habil_antes(primer_dia_mes)
+                dias_venc = (fecha_venc - hoy).days
+                curva.append({"mes": etiqueta, "ticker": ticker, "precio": precio,
+                              "vencimiento": fecha_venc.isoformat(),
+                              "dias_venc": dias_venc})
             else:
                 log(f"  Aviso: curva forward sin datos para {etiqueta} ({ticker}); "
                     "probablemente ya expiró, se omite.")
@@ -1504,7 +1572,7 @@ def crear_graficos_fx(diario, ruta_png):
 # ------------------------------------------------------------------
 def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
                   construccion=None, chatarra=None, productores=None,
-                  curva_forward=None):
+                  curva_forward=None, volatilidad_hh=None, tasa_libre_riesgo=None):
     """Tira todo a un JSON compacto que es lo que consume el index.html."""
     def limpia(serie, dec=6):
         out = []
@@ -1637,6 +1705,13 @@ def escribir_json(diario, macro, ruta, acereras=None, info_acereras=None,
     if curva_forward:
         obj["curva_forward_hh"] = curva_forward
 
+    # Volatilidad histórica de HH (proxy de la implícita) y tasa libre de
+    # riesgo (FRED:DGS3MO) — las usa la calculadora Black-76 en "Coberturas".
+    if volatilidad_hh is not None:
+        obj["volatilidad_hh"] = volatilidad_hh
+    if tasa_libre_riesgo is not None:
+        obj["tasa_libre_riesgo"] = tasa_libre_riesgo
+
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
 
@@ -1691,6 +1766,20 @@ def main():
             log(f"  Aviso: la curva forward falló y se omite: {e}")
             curva_forward = None
 
+        log("Calculando volatilidad histórica de Henry Hub (proxy de implícita)...")
+        try:
+            volatilidad_hh = obtener_volatilidad_hh(diario)
+        except Exception as e:
+            log(f"  Aviso: la volatilidad histórica falló y se omite: {e}")
+            volatilidad_hh = None
+
+        log("Descargando tasa libre de riesgo (FRED:DGS3MO)...")
+        try:
+            tasa_libre_riesgo = obtener_tasa_libre_riesgo()
+        except Exception as e:
+            log(f"  Aviso: la tasa libre de riesgo falló y se omite: {e}")
+            tasa_libre_riesgo = None
+
         xlsx_fecha = CARPETA / f"mercados_{HOY}.xlsx"
         xlsx_recie = CARPETA / "mercados_reciente.xlsx"
         png_fecha = CARPETA / f"graficos_{HOY}.png"
@@ -1709,7 +1798,8 @@ def main():
         escribir_json(diario, macro, CARPETA / "datos.json",
                       acereras=acereras, info_acereras=info_ac,
                       construccion=construccion, chatarra=chatarra,
-                      productores=productores, curva_forward=curva_forward)
+                      productores=productores, curva_forward=curva_forward,
+                      volatilidad_hh=volatilidad_hh, tasa_libre_riesgo=tasa_libre_riesgo)
 
         ult_hh = diario.dropna(subset=[COL_HH]).iloc[-1]
         log(f"Henry Hub más reciente: ${ult_hh[COL_HH]:.2f}/MMBtu ({ult_hh['fecha'].date()})")
