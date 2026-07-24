@@ -367,6 +367,7 @@ def _tercer_dia_habil_antes(fecha):
 
 
 
+def obtener_curva_forward_hh(n_meses=7):
     """
     Curva forward de Henry Hub (NYMEX) para los próximos n_meses contratos
     mensuales, vía Yahoo (yfinance). Uso los tickers de mes específico
@@ -1765,6 +1766,22 @@ def main():
         except Exception as e:
             log(f"  Aviso: la curva forward falló y se omite: {e}")
             curva_forward = None
+
+        if not curva_forward:
+            # Yahoo a veces bloquea/falla peticiones automatizadas de forma
+            # intermitente. En vez de dejar el campo vacío (lo que hace que
+            # el panel muestre valores de ejemplo genéricos), reutilizo la
+            # última curva real guardada — sigue siendo un dato de mercado
+            # de verdad, solo que de la corrida anterior.
+            try:
+                anterior = json.loads((CARPETA / "datos.json").read_text(encoding="utf-8"))
+                curva_previa = anterior.get("curva_forward_hh")
+                if curva_previa:
+                    curva_forward = curva_previa
+                    log(f"  Aviso: usando la curva forward de la corrida anterior "
+                        f"({len(curva_previa)} meses) porque la de hoy vino vacía.")
+            except Exception as e:
+                log(f"  Aviso: no se pudo recuperar la curva forward anterior: {e}")
 
         log("Calculando volatilidad histórica de Henry Hub (proxy de implícita)...")
         try:
