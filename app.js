@@ -1129,9 +1129,9 @@ function calcularBlack76(){
   if(Math.abs(diff) < 0.01){
     veredicto.innerHTML = `<span style="color:var(--sube); font-weight:700;">✓ Aprox. costo cero —</span> el put y el call teóricos están prácticamente balanceados con esta volatilidad.`;
   } else if(diff>0){
-    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Put &gt; Call —</span> el piso teóricamente vale más que el techo; para que el collar sea costo cero, el bróker debería pagarte una prima neta de $${diff.toFixed(4)}/MMBtu, o tendrías que subir el piso / bajar el techo.`;
+    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Put &gt; Call —</span> el piso teóricamente vale más que el techo; para que el collar sea costo cero, el bróker debería pagarte una prima neta de $${diff.toFixed(4)}/MMBtu, o tendrías que bajar el piso y bajar el techo (ambos strikes en la misma dirección).`;
   } else {
-    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Call &gt; Put —</span> el techo teóricamente vale más que el piso; tendrías que pagar una prima neta de $${(-diff).toFixed(4)}/MMBtu, o bajar el piso / subir el techo para llegar a costo cero.`;
+    veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Call &gt; Put —</span> el techo teóricamente vale más que el piso; tendrías que pagar una prima neta de $${(-diff).toFixed(4)}/MMBtu, o subir el piso y subir el techo (ambos strikes en la misma dirección) para llegar a costo cero.`;
   }
 }
 
