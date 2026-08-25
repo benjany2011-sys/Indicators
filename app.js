@@ -47,12 +47,10 @@ function gradFill(color){
   };
 }
 // ===== fin mejoras =====
-
 const DATA_URL = "resultados/datos.json";
 let DATA = null;
 const charts = {};        // instancias por id
 const construido = {};    // pestañas ya construidas
-
 function fmtNum(v, fmt){
   if(v===null || v===undefined) return "—";
   if(fmt==="0.0%") return (v*100).toFixed(1)+"%";
@@ -60,14 +58,12 @@ function fmtNum(v, fmt){
   if(fmt && fmt.indexOf(".")>-1) dec = fmt.split(".")[1].length;
   return v.toLocaleString("es-MX",{minimumFractionDigits:dec, maximumFractionDigits:dec});
 }
-
 // últimos dos valores no nulos de un arreglo -> [actual, previo]
 function ultimosDos(arr){
   const r=[];
   for(let i=arr.length-1;i>=0 && r.length<2;i--){ if(arr[i]!==null && arr[i]!==undefined) r.push(arr[i]); }
   return r;
 }
-
 // promedio móvil sobre una ventana de posiciones (ignora huecos/nulos)
 function mediaMovil(arr, ventana){
   const out = new Array(arr.length).fill(null);
@@ -81,7 +77,6 @@ function mediaMovil(arr, ventana){
   }
   return out;
 }
-
 // cambio vs. dato previo disponible (solo para series de resumen: commodities + divisas)
 function cambio(serie){
   const arr = DATA.series[serie];
@@ -90,7 +85,6 @@ function cambio(serie){
   if(v.length<2 || v[1]===0) return null;
   return {pp:false, val:(v[0]-v[1])/v[1]*100};
 }
-
 function htmlDelta(c){
   if(!c) return "<span class='delta flat'>—</span>";
   const arriba = c.val > 0.0005, abajo = c.val < -0.0005;
@@ -101,7 +95,6 @@ function htmlDelta(c){
                    : (signo+c.val.toFixed(2)+"%");
   return "<span class='delta "+cls+"'>"+flecha+" "+txt+"</span>";
 }
-
 function tarjeta(r){
   const c = cambio(r.serie);
   const el=document.createElement("div"); el.className="card";
@@ -120,9 +113,7 @@ function tarjeta(r){
   registrarSpark(el, (DATA.series && DATA.series[r.serie])||[], colorDelta(c));
   return el;
 }
-
 function esFX(nombre){ return nombre.indexOf(" por USD")>-1 || nombre.indexOf("USD por ")===0; }
-
 // nombre amigable de cada divisa para el texto interpretativo
 // dominio de cada acerera, para pedirle el logo a Clearbit (gratis, sin key).
 // si una empresa no está aquí, o el logo falla, la tarjeta se ve igual que antes.
@@ -162,14 +153,12 @@ function logoAcerera(nombre){
   if(!dom) return "";
   return "<img class='logo-acerera' src='https://img.logo.dev/"+dom+"?token=pk_ViN51m9GS9qe0Tbrjv4Sqw&size=64' alt='' onerror=\"this.remove()\">";
 }
-
 const NOMBRE_DIVISA = {
   EUR:"el euro", JPY:"el yen", CNY:"el yuan", GBP:"la libra", MXN:"el peso",
   CAD:"el dólar canadiense", TRY:"la lira turca", BRL:"el real brasileño", AUD:"el dólar australiano",
   INR:"la rupia india", KRW:"el won coreano", COP:"el peso colombiano", HKD:"el dólar de Hong Kong",
 };
 function capitaliza(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
-
 // interpreta qué le pasó a la DIVISA (no al número) según la columna y el cambio
 function interpretaFX(serie, c){
   if(!c) return "";
@@ -182,7 +171,6 @@ function interpretaFX(serie, c){
   const fuerte = subio ? subeEsFuerte : !subeEsFuerte;
   return capitaliza(nombre)+(fuerte ? " se fortaleció" : " se debilitó");
 }
-
 // registro el plugin de zoom (si el <script> lo auto-registró, no lo duplico)
 function registrarZoom(){
   try{
@@ -191,7 +179,6 @@ function registrarZoom(){
     if(!ya && window.ChartZoom) Chart.register(window.ChartZoom);
   }catch(e){}
 }
-
 // rueda = zoom; arrastrar = caja de zoom; ctrl+arrastrar = mover; doble clic = reset
 const ZOOM_OPTS = {
   zoom:{
@@ -202,7 +189,6 @@ const ZOOM_OPTS = {
   },
   pan:{ enabled:true, mode:"xy", modifierKey:"ctrl" }
 };
-
 const BASE_OPTS = {
   responsive:true, maintainAspectRatio:false,
   interaction:{mode:"index", intersect:false},
@@ -261,16 +247,13 @@ function lineChart(id, labels, datasets, opts){
   c.canvas.addEventListener("dblclick", ()=>{ try{ c.resetZoom(); }catch(e){} });  // doble clic = reset zoom
   charts[id]=c; return c;
 }
-
 function ultimosDosMacro(valores){
   const r=[];
   for(let i=valores.length-1;i>=0 && r.length<2;i--){ if(valores[i]!==null && valores[i]!==undefined) r.push(valores[i]); }
   return r;
 }
-
 // busca el índice de un indicador macro por palabra clave en el nombre
 function _macroIdx(kw){ return (DATA.macro||[]).findIndex(x=>(x.nombre||"").toLowerCase().includes(kw)); }
-
 function construirMacro(){
   const cont=document.getElementById("cards-macro");
   const graf=document.getElementById("graf-macro");
@@ -305,7 +288,6 @@ function construirMacro(){
     graf.appendChild(panel);
   });
 }
-
 function graficarMacro(){
   const macro = DATA.macro||[];
   const iInfl=_macroIdx("inflaci"), iDes=_macroIdx("desemple");
@@ -330,14 +312,12 @@ function graficarMacro(){
     });
   });
 }
-
 // formatea un valor de construcción según su unidad (prefijo, decimales, sufijo)
 function fmtConstr(v, ind){
   if(v===null || v===undefined) return "—";
   const n = v.toLocaleString("es-MX",{minimumFractionDigits:ind.dec, maximumFractionDigits:ind.dec});
   return (ind.prefijo||"")+n+(ind.sufijo||"");
 }
-
 function construirConstruccion(){
   const cont=document.getElementById("cards-construccion");
   const graf=document.getElementById("graf-construccion");
@@ -369,7 +349,6 @@ function construirConstruccion(){
     graf.appendChild(panel);
   });
 }
-
 function graficarConstruccion(){
   (DATA.construccion||[]).forEach((ind, k)=>{
     lineChart("c-constr-"+k, ind.fecha, [{data:ind.valores, borderColor:"#FF9D2E"}], {
@@ -378,7 +357,6 @@ function graficarConstruccion(){
     });
   });
 }
-
 function construirChatarra(){
   const cont=document.getElementById("cards-chatarra");
   const graf=document.getElementById("graf-chatarra");
@@ -410,7 +388,6 @@ function construirChatarra(){
     graf.appendChild(panel);
   });
 }
-
 function graficarChatarra(){
   (DATA.chatarra||[]).forEach((ind, k)=>{
     lineChart("c-chat-"+k, ind.fecha, [{data:ind.valores, borderColor:"#FF9D2E"}], {
@@ -432,7 +409,6 @@ function graficarChatarra(){
     });
   });
 }
-
 function etiquetaCorr(r){
   if(r===null || r===undefined) return "Sin dato suficiente";
   const ar=Math.abs(r);
@@ -441,7 +417,6 @@ function etiquetaCorr(r){
   const sentido = r>=0 ? "se mueven en el mismo sentido" : "se mueven en sentido opuesto";
   return "Correlación "+signo+" "+fuerza+" · "+sentido;
 }
-
 function construirAcereras(){
   const a = DATA.acereras;
   const cont = document.getElementById("cards-acereras");
@@ -463,7 +438,6 @@ function construirAcereras(){
     "<b>Grupo mundial:</b> "+((a.ok_mundial||[]).join(", ")||"—")+
     "<br><b>Grupo EE. UU.:</b> "+((a.ok_eeuu||[]).join(", ")||"—")+
     ((a.fallaron&&a.fallaron.length)?"<br><span class='gris'>Sin datos (omitidas): "+a.fallaron.join(", ")+"</span>":"");
-
   // Tarjetas de precio por acción (estilo divisas): último cierre + % de cambio.
   const cp = document.getElementById("cards-acereras-precios");
   const pr = a.precios;
@@ -476,7 +450,6 @@ function construirAcereras(){
     }
   }
 }
-
 // tarjeta de una acción: nombre, último precio (USD) y % vs. día previo
 function tarjetaPrecio(p){
   const c = (p.cambio===null || p.cambio===undefined) ? null : {pp:false, val:p.cambio};
@@ -491,7 +464,6 @@ function tarjetaPrecio(p){
   try{ registrarSpark(el, DATA.acereras.precios.series[p.nombre]||[], colorDelta(c)); }catch(_e){}
   return el;
 }
-
 function graficarAcereras(){
   const a = DATA.acereras;
   if(!a) return;
@@ -510,7 +482,6 @@ function graficarAcereras(){
       tooltip:{ callbacks:{ label:c=> (c.parsed.y!=null? c.parsed.y.toFixed(2):"—") } } },
     scales:{ y:{ suggestedMin:-1, suggestedMax:1 } }
   });
-
   // Gráfica de precio por acción con selector (estilo divisas).
   const pr = a.precios;
   const sel = document.getElementById("sel-accion");
@@ -533,10 +504,8 @@ function graficarAcereras(){
     });
   }
 }
-
 let _prodMetrica = "ytd";   // "ytd" o "mes"
 let _prodMesIdx = 0;        // índice dentro de meses[] (0 = más reciente)
-
 // nombres de país en español (worldsteel los manda en inglés). Si alguno no está
 // en el mapa, se queda como viene, así nunca aparece vacío.
 const _PROD_ES = {
@@ -548,7 +517,6 @@ const _PROD_ES = {
   "Ukraine":"Ucrania", "Mexico":"México", "Spain":"España", "France":"Francia",
 };
 function _prodNombreES(p){ return _PROD_ES[p] || p; }
-
 function _prodPeriodoBonito(p){
   if(!p) return "";
   const meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio",
@@ -556,7 +524,6 @@ function _prodPeriodoBonito(p){
   const [a,m]=p.split("-"); const i=parseInt(m,10)-1;
   return (meses[i]||p)+" "+a;
 }
-
 // lista de meses disponibles; si el JSON es viejo (sin 'meses') armo uno solo
 function _prodMesesArr(){
   const pr = DATA.productores;
@@ -570,7 +537,6 @@ function _prodSnap(){
   const arr=_prodMesesArr();
   return arr[Math.min(_prodMesIdx, arr.length-1)] || null;
 }
-
 function construirProductores(){
   const pr = DATA.productores;
   const cont = document.getElementById("cards-productores");
@@ -604,21 +570,18 @@ function construirProductores(){
   });
   _prodActualizar();
 }
-
 // repinta subtítulo + tarjetas + gráfica según el mes y la métrica activos
 function _prodActualizar(){
   const pr = DATA.productores;
   const snap = _prodSnap();
   if(!snap) return;
   const periodoTxt = _prodPeriodoBonito(snap.periodo);
-
   const spanP = document.getElementById("prod-periodo");
   if(spanP){
     spanP.innerHTML = "· "+periodoTxt+
       (pr && pr.respaldo ? " <span style='color:var(--gris);'>(respaldo)</span>" : "")+
       (snap.fuente_url ? "  ·  <a href='"+snap.fuente_url+"' target='_blank' rel='noopener' style='color:var(--gold);'>fuente</a>" : "");
   }
-
   // tarjetas: top 3 por acumulado del mes seleccionado
   const cont = document.getElementById("cards-productores");
   cont.innerHTML = "";
@@ -632,23 +595,19 @@ function _prodActualizar(){
       "<div class='fecha'>"+periodoTxt+"</div>";
     cont.appendChild(card);
   });
-
   graficarProductores();
 }
-
 function graficarProductores(){
   const snap = _prodSnap();
   if(!snap || !Array.isArray(snap.paises) || !snap.paises.length) return;
   const esYTD = _prodMetrica==="ytd";
   const campoMt  = esYTD ? "ytd_mt"      : "mes_mt";
   const campoVar = esYTD ? "var_ytd_pct" : "var_mes_pct";
-
   const filas = [...snap.paises].sort((a,b)=> b[campoMt]-a[campoMt]);
   const labels  = filas.map(p=>_prodNombreES(p.pais));
   const valores = filas.map(p=>p[campoMt]);
   const cambios = filas.map(p=>p[campoVar]);
   const colores = cambios.map(v=> v>=0 ? "#37d67a" : "#ff5b5b");
-
   const id="c-productores";
   if(charts[id]){
     charts[id].data.labels = labels;
@@ -679,7 +638,6 @@ function graficarProductores(){
   c._cambios = cambios;
   charts[id]=c;
 }
-
 function construirGraficas(tab){
   const f=DATA.fechas, s=DATA.series;
   if(tab==="commodities"){
@@ -720,19 +678,16 @@ function construirGraficas(tab){
     sel.addEventListener("change", ()=>{ fx.data.datasets[0].data = s[sel.value]; fx.update(); });
   }
 }
-
 function mostrarTab(tab){
   document.querySelectorAll(".tab").forEach(b=> b.classList.toggle("activo", b.dataset.tab===tab));
   document.querySelectorAll("section").forEach(sec=> sec.classList.toggle("activa", sec.id==="sec-"+tab));
   requestAnimationFrame(dibujarSparks);
-  if(tab==="swap" && !construido.swap){ iniciarSwap(); iniciarComparador(); construido.swap=true; }
+  if(tab==="swap" && !construido.swap){ iniciarSwap(); iniciarComparador(); iniciarTramos(); construido.swap=true; }
   if(!construido[tab]){ construirGraficas(tab); construido[tab]=true; }
   else { Object.values(charts).forEach(c=> c.resize()); }
 }
-
 // ---- Comparación entre las dos simulaciones (fair value vs swap/collar) ----
 const COMPARACION = { fair:null, swap:null, none:null, collar:null };
-
 function actualizarComparacion(){
   const { fair, swap, none, collar } = COMPARACION;
   if(fair===null || swap===null || none===null || collar===null) return;
@@ -741,7 +696,6 @@ function actualizarComparacion(){
   document.getElementById("cmp-swap").textContent = fmt(swap);
   document.getElementById("cmp-none").textContent = fmt(none);
   document.getElementById("cmp-collar").textContent = fmt(collar);
-
   const opciones = [
     { nombre:"Fair value WMC", valor:fair },
     { nombre:"Swap cotizado", valor:swap },
@@ -753,14 +707,11 @@ function actualizarComparacion(){
   const veredicto = document.getElementById("cmp-veredicto");
   veredicto.innerHTML = `<b>Más barata: ${mejor.nombre}</b> (${fmt(mejor.valor)}). Orden completo, de menor a mayor costo: ${opciones.map(o=>o.nombre+" "+fmt(o.valor)).join(" · ")}.`;
 }
-
 // ---- SWAP GAS: fair value calculator ----
 const SWAP_MESES = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar","Abr","May"];
 const SWAP_FWD_DEFAULT = [2.65,2.70,2.72,2.75,2.90,3.15,3.30,3.10,2.95,2.80,2.70,2.68];
-
 let SW_SELECTED_K = 1;
 let SW_CURRENT_MESES = SWAP_MESES.slice();
-
 function iniciarSwap(){
   const nInput = document.getElementById("sw-nmonths");
   const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
@@ -795,7 +746,6 @@ function iniciarSwap(){
   ["sw-beta","sw-int","sw-vol","sw-margin","sw-price"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularSwap);
   });
-
   const seeEl = document.getElementById("sw-see");
   const marginEl = document.getElementById("sw-margin");
   const applyTargetMarginFromK = ()=>{
@@ -813,10 +763,8 @@ function iniciarSwap(){
   });
   seeEl.addEventListener("input", applyTargetMarginFromK);
   applyTargetMarginFromK();
-
   rebuildMonths();
 }
-
 function calcularSwap(){
   const beta = parseFloat(document.getElementById("sw-beta").value)||0;
   const intercept = parseFloat(document.getElementById("sw-int").value)||0;
@@ -824,7 +772,6 @@ function calcularSwap(){
   const swapPrice = parseFloat(document.getElementById("sw-price").value)||0;
   const targetMargin = parseFloat(document.getElementById("sw-margin").value)||0;
   const fwds = Array.from(document.querySelectorAll(".sw-fwd")).map(el=> parseFloat(el.value)||0);
-
   let totalVol=0, totalFairCost=0, totalSwapCost=0, weightedFairSum=0, rows="";
   fwds.forEach((hsc,i)=>{
     const fairWMC = beta*hsc + intercept;
@@ -842,31 +789,25 @@ function calcularSwap(){
     </tr>`;
   });
   document.getElementById("sw-tbody").innerHTML = rows;
-
   const fairAvg = totalVol>0 ? weightedFairSum/totalVol : 0;
   const impliedMargin = swapPrice - fairAvg;
   const marginDelta = impliedMargin - targetMargin;
-
   document.getElementById("sw-fair").textContent = "$"+fairAvg.toFixed(3);
   const impliedEl = document.getElementById("sw-implied");
   impliedEl.textContent = (impliedMargin>=0?"+":"")+"$"+impliedMargin.toFixed(3);
   impliedEl.style.color = impliedMargin>0 ? "var(--baja)" : "var(--sube)";
-
   const deltaEl = document.getElementById("sw-delta");
   deltaEl.textContent = (marginDelta>=0?"+":"")+"$"+marginDelta.toFixed(3);
   deltaEl.style.color = marginDelta>0 ? "var(--baja)" : "var(--sube)";
-
   const verdict = document.getElementById("sw-verdict");
   if(impliedMargin <= targetMargin){
     verdict.innerHTML = `<span style="color:var(--sube); font-weight:700;">✓ Favorable —</span> el swap cotizado a $${swapPrice.toFixed(3)} queda dentro de tu margen objetivo sobre el fair value.`;
   } else {
     verdict.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Revisar —</span> el swap cotizado a $${swapPrice.toFixed(3)} implica un margen de $${impliedMargin.toFixed(3)} sobre el fair value, arriba de tu objetivo de $${targetMargin.toFixed(3)}. Hay espacio para negociar.`;
   }
-
   COMPARACION.fair = totalFairCost;
   COMPARACION.swap = totalSwapCost;
   actualizarComparacion();
-
   if(!b76FwdManual){
     const avg = promedioCurvaHSC();
     const fwdInput = document.getElementById("b76-fwd");
@@ -878,12 +819,76 @@ function calcularSwap(){
     if(diasProm!=null && diasInput){ diasInput.value = diasProm; calcularBlack76(); }
   }
 }
-
+// ---- Cobertura por tramos: varios precios, mismo periodo ----
+let TR_TRAMOS = [];
+let TR_ID = 0;
+function iniciarTramos(){
+  document.getElementById("tr-add").addEventListener("click", ()=> agregarTramo());
+  ["tr-consumo","tr-ref"].forEach(id=>{
+    document.getElementById(id).addEventListener("input", calcularTramos);
+  });
+  // arranca con 3 tramos de ejemplo (como la estrategia real: 3 hedges al 33%)
+  agregarTramo(3.06); agregarTramo(3.06); agregarTramo(3.06);
+}
+function agregarTramo(precio){
+  const consumo = parseFloat(document.getElementById("tr-consumo").value)||0;
+  const volDefault = consumo>0 ? Math.round(consumo/Math.max(TR_TRAMOS.length+1,3)) : 0;
+  TR_TRAMOS.push({ id: TR_ID++, precio: precio!=null?precio:2.90, volumen: volDefault });
+  renderTramos();
+}
+function eliminarTramo(id){
+  TR_TRAMOS = TR_TRAMOS.filter(t=> t.id!==id);
+  renderTramos();
+}
+function renderTramos(){
+  const tbody = document.getElementById("tr-tbody");
+  const volTotal = TR_TRAMOS.reduce((a,t)=> a+(parseFloat(t.volumen)||0), 0);
+  tbody.innerHTML = TR_TRAMOS.map((t,i)=>{
+    const pct = volTotal>0 ? (t.volumen/volTotal*100) : 0;
+    return `<tr style="border-bottom:1px solid var(--linea);">
+      <td style="padding:6px 8px;">Tramo ${i+1}</td>
+      <td style="padding:6px 8px; text-align:right;"><input type="number" step="0.001" class="prod-sel tr-precio" data-id="${t.id}" value="${t.precio}" style="width:100px; text-align:right;"></td>
+      <td style="padding:6px 8px; text-align:right;"><input type="number" step="100" class="prod-sel tr-volumen" data-id="${t.id}" value="${t.volumen}" style="width:110px; text-align:right;"></td>
+      <td style="padding:6px 8px; text-align:right;">${pct.toFixed(1)}%</td>
+      <td style="padding:6px 8px; text-align:right;"><button class="btn ghost tr-del" data-id="${t.id}" style="font-size:11px;padding:4px 8px;">✕</button></td>
+    </tr>`;
+  }).join("");
+  tbody.querySelectorAll(".tr-precio").forEach(el=> el.addEventListener("input", (e)=>{
+    const t = TR_TRAMOS.find(x=>x.id===parseInt(e.target.dataset.id)); if(t) t.precio = parseFloat(e.target.value)||0;
+    calcularTramos();
+  }));
+  tbody.querySelectorAll(".tr-volumen").forEach(el=> el.addEventListener("input", (e)=>{
+    const t = TR_TRAMOS.find(x=>x.id===parseInt(e.target.dataset.id)); if(t) t.volumen = parseFloat(e.target.value)||0;
+    renderTramos();
+  }));
+  tbody.querySelectorAll(".tr-del").forEach(el=> el.addEventListener("click", (e)=> eliminarTramo(parseInt(e.target.dataset.id))));
+  calcularTramos();
+}
+function calcularTramos(){
+  const consumo = parseFloat(document.getElementById("tr-consumo").value)||0;
+  const ref = parseFloat(document.getElementById("tr-ref").value)||0;
+  const volTotal = TR_TRAMOS.reduce((a,t)=> a+(parseFloat(t.volumen)||0), 0);
+  const costoTotal = TR_TRAMOS.reduce((a,t)=> a+(parseFloat(t.volumen)||0)*(parseFloat(t.precio)||0), 0);
+  const blend = volTotal>0 ? costoTotal/volTotal : 0;
+  const cobertura = consumo>0 ? (volTotal/consumo*100) : 0;
+  document.getElementById("tr-volTotal").textContent = volTotal.toLocaleString();
+  const covEl = document.getElementById("tr-cobertura");
+  covEl.textContent = cobertura.toFixed(1)+"%";
+  covEl.style.color = cobertura>100 ? "var(--baja)" : (cobertura>=95 ? "var(--sube)" : "var(--tinta)");
+  document.getElementById("tr-blend").textContent = "$"+blend.toFixed(3);
+  const diff = blend - ref;
+  let msg = `Precio blend ponderado: $${blend.toFixed(3)}/MMBtu sobre ${volTotal.toLocaleString()} MMBtu (${cobertura.toFixed(1)}% del consumo de ${consumo.toLocaleString()} MMBtu). `;
+  if(ref>0){
+    msg += diff<=0
+      ? `<span style="color:var(--sube); font-weight:700;">${diff===0?'Igual a':'$'+Math.abs(diff).toFixed(3)+' por debajo de'} tu referencia de $${ref.toFixed(3)}.</span>`
+      : `<span style="color:var(--baja); font-weight:700;">$${diff.toFixed(3)} por encima de tu referencia de $${ref.toFixed(3)}.</span>`;
+  }
+  if(cobertura>100) msg += ` <span style="color:var(--baja);">Ojo: la suma de los tramos supera el consumo del periodo.</span>`;
+  document.getElementById("tr-veredicto").innerHTML = msg;
+}
 function mostrarAviso(msg){ const a=document.getElementById("aviso"); a.style.display="block"; a.innerHTML=msg; }
-
 // ---- SWAP vs COLLAR: comparador de escenarios ----
 let cpModo = "swap";
-
 function cpFmtMM(n){
   const abs = Math.abs(n);
   const signo = n<0 ? "-" : "";
@@ -891,14 +896,12 @@ function cpFmtMM(n){
   if(abs >= 1e3) return signo+"$"+(abs/1e3).toFixed(1)+"K";
   return signo+"$"+abs.toFixed(0);
 }
-
 function cpCosto(hsc, swapPrice, floor, cap, modo){
   if(modo==="none") return hsc;
   if(modo==="swap") return swapPrice;
   if(modo==="collar") return Math.min(Math.max(hsc, floor), cap);
   return hsc;
 }
-
 function iniciarComparador(){
   document.querySelectorAll("#cp-toggle .prod-btn").forEach(b=>{
     b.classList.toggle("activo", b.dataset.modo===cpModo);
@@ -920,7 +923,6 @@ function iniciarComparador(){
   });
   calcularComparador();
 }
-
 function calcularComparador(){
   const vol = parseFloat(document.getElementById("cp-vol").value)||0;
   const nmeses = parseFloat(document.getElementById("cp-nmeses").value)||1;
@@ -931,26 +933,21 @@ function calcularComparador(){
   const rMin = parseFloat(document.getElementById("cp-rmin").value)||1;
   const rMax = parseFloat(document.getElementById("cp-rmax").value)||5;
   const totalVol = vol*nmeses;
-
   const N = 60, xs=[];
   for(let i=0;i<=N;i++){ xs.push(rMin + (rMax-rMin)*i/N); }
   const noHedgePL = xs.map(h=> -(h-spot)*totalVol);
   const hedgePL = xs.map(h=> -(cpCosto(h, swapPrice, floor, cap, cpModo) - spot)*totalVol);
-
   let breakevenTxt;
   if(cpModo==="swap") breakevenTxt = "$"+swapPrice.toFixed(3);
   else if(cpModo==="collar") breakevenTxt = `$${floor.toFixed(2)}–$${cap.toFixed(2)}`;
   else breakevenTxt = "$"+spot.toFixed(3);
-
   const worst = Math.min(...hedgePL);
   const ceilingPrice = cpModo==="swap" ? swapPrice : (cpModo==="collar" ? cap : rMax);
-
   document.getElementById("cp-maxloss").textContent = cpModo==="none" ? "sin límite" : cpFmtMM(worst);
   document.getElementById("cp-maxloss").style.color = cpModo==="none" ? "var(--baja)" : "var(--tinta)";
   document.getElementById("cp-breakeven").textContent = breakevenTxt;
   document.getElementById("cp-ceiling").textContent = "$"+ceilingPrice.toFixed(3);
   document.getElementById("cp-premium").textContent = "$0";
-
   const datasets = [
     { label:"Sin cobertura", data: xs.map((x,i)=>({x,y:noHedgePL[i]})), borderColor:"#B8BCC0", borderDash:[6,4], borderWidth:2, pointRadius:0 }
   ];
@@ -961,7 +958,6 @@ function calcularComparador(){
       borderColor:"#FFC400", borderWidth:2.5, pointRadius:0
     });
   }
-
   if(charts["c-swapcollar"]) charts["c-swapcollar"].destroy();
   charts["c-swapcollar"] = new Chart(document.getElementById("c-swapcollar"), {
     type:"line",
@@ -987,7 +983,6 @@ function calcularComparador(){
       }
     }
   });
-
   const escenarios = [
     { nombre:"Muy desfavorable", hsc: Math.min(rMax, spot*1.4) },
     { nombre:"Desfavorable", hsc: Math.min(rMax, spot*1.2) },
@@ -1015,21 +1010,17 @@ function calcularComparador(){
   });
   document.getElementById("cp-tbody").innerHTML = rows;
   window.ESCENARIOS_CSV = csvRows;
-
   COMPARACION.none = spot*totalVol;
   COMPARACION.collar = cpCosto(spot, swapPrice, floor, cap, "collar")*totalVol;
   actualizarComparacion();
 }
-
 // ---- Candado de acceso (Coberturas + descarga de Excel) ----
 const COB_HASH = "772b17f5d551de57fcdfe7e3ec743aa6c3351081a65158729d6333e91fa74b0a";
 let cobAuth = sessionStorage.getItem("cob_auth") === "1";
-
 async function sha256Hex(str){
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=> b.toString(16).padStart(2,"0")).join("");
 }
-
 async function pedirPassword(){
   if(cobAuth) return true;
   const intento = prompt("Esta sección requiere contraseña:");
@@ -1043,7 +1034,6 @@ async function pedirPassword(){
   alert("Contraseña incorrecta.");
   return false;
 }
-
 // ---- Descarga CSV de Escenarios ----
 function descargarEscenariosCSV(){
   const rows = window.ESCENARIOS_CSV;
@@ -1056,7 +1046,6 @@ function descargarEscenariosCSV(){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
 // ---- Black-76: valuación de opciones sobre futuros ----
 function normCDF(x){
   const t = 1/(1+0.2316419*Math.abs(x));
@@ -1065,7 +1054,6 @@ function normCDF(x){
   if(x>0) p = 1-p;
   return p;
 }
-
 function black76(fwd, strike, volPct, dias, rPct){
   const sigma = volPct/100, T = dias/365, r = rPct/100;
   if(fwd<=0 || strike<=0 || sigma<=0 || T<=0) return {call:0, put:0};
@@ -1076,14 +1064,12 @@ function black76(fwd, strike, volPct, dias, rPct){
   const put = disc*(strike*normCDF(-d2) - fwd*normCDF(-d1));
   return {call, put};
 }
-
 // se ponen en true en cuanto el usuario edita el campo a mano; mientras
 // sigan en false, los mantenemos sincronizados con los datos automáticos.
 let b76FwdManual = false;
 let b76VolManual = false;
 let b76DiasManual = false;
 let b76RManual = false;
-
 function promedioCurvaHSC(){
   const inputs = document.querySelectorAll(".sw-fwd");
   if(inputs.length){
@@ -1097,7 +1083,6 @@ function promedioCurvaHSC(){
   if(!arr.length) return null;
   return arr.reduce((a,b)=>a+b,0)/arr.length;
 }
-
 function promedioDiasVenc(){
   const nMonths = parseInt(document.getElementById("sw-nmonths")?.value)||7;
   const fwdReal = (DATA && Array.isArray(DATA.curva_forward_hh)) ? DATA.curva_forward_hh : null;
@@ -1106,7 +1091,6 @@ function promedioDiasVenc(){
   if(!vals.length) return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
-
 function calcularBlack76(){
   const fwd = parseFloat(document.getElementById("b76-fwd").value)||0;
   const vol = parseFloat(document.getElementById("b76-vol").value)||0;
@@ -1114,17 +1098,14 @@ function calcularBlack76(){
   const kCall = parseFloat(document.getElementById("b76-kcall").value)||0;
   const dias = parseFloat(document.getElementById("b76-dias").value)||0;
   const r = parseFloat(document.getElementById("b76-r").value)||0;
-
   const put = black76(fwd, kPut, vol, dias, r).put;
   const call = black76(fwd, kCall, vol, dias, r).call;
   const diff = put - call;
-
   document.getElementById("b76-pput").textContent = "$"+put.toFixed(4);
   document.getElementById("b76-pcall").textContent = "$"+call.toFixed(4);
   const diffEl = document.getElementById("b76-diff");
   diffEl.textContent = (diff>=0?"+":"")+"$"+diff.toFixed(4);
   diffEl.style.color = Math.abs(diff)<0.01 ? "var(--tinta)" : (diff>0 ? "var(--baja)" : "var(--sube)");
-
   const veredicto = document.getElementById("b76-veredicto");
   if(Math.abs(diff) < 0.01){
     veredicto.innerHTML = `<span style="color:var(--sube); font-weight:700;">✓ Aprox. costo cero —</span> el put y el call teóricos están prácticamente balanceados con esta volatilidad.`;
@@ -1134,17 +1115,14 @@ function calcularBlack76(){
     veredicto.innerHTML = `<span style="color:var(--baja); font-weight:700;">⚠ Call &gt; Put —</span> el techo teóricamente vale más que el piso; tendrías que pagar una prima neta de $${(-diff).toFixed(4)}/MMBtu, o subir el piso y subir el techo (ambos strikes en la misma dirección) para llegar a costo cero.`;
   }
 }
-
 function iniciarBlack76(){
   const fwdInput = document.getElementById("b76-fwd");
   const volInput = document.getElementById("b76-vol");
   const diasInput = document.getElementById("b76-dias");
   const rInput = document.getElementById("b76-r");
-
   const avg = promedioCurvaHSC();
   if(avg!=null) fwdInput.value = avg.toFixed(3);
   fwdInput.addEventListener("input", ()=>{ b76FwdManual = true; });
-
   const volFuenteEl = document.getElementById("b76-vol-fuente");
   if(DATA && typeof DATA.volatilidad_hh === "number"){
     if(!b76VolManual) volInput.value = DATA.volatilidad_hh;
@@ -1154,7 +1132,6 @@ function iniciarBlack76(){
     volFuenteEl.style.color = "var(--baja)";
   }
   volInput.addEventListener("input", ()=>{ b76VolManual = true; });
-
   const diasProm = promedioDiasVenc();
   const diasFuenteEl = document.getElementById("b76-dias-fuente");
   if(diasProm!=null){
@@ -1165,7 +1142,6 @@ function iniciarBlack76(){
     diasFuenteEl.style.color = "var(--baja)";
   }
   diasInput.addEventListener("input", ()=>{ b76DiasManual = true; });
-
   const rFuenteEl = document.getElementById("b76-r-fuente");
   if(DATA && typeof DATA.tasa_libre_riesgo === "number"){
     if(!b76RManual) rInput.value = DATA.tasa_libre_riesgo;
@@ -1175,13 +1151,11 @@ function iniciarBlack76(){
     rFuenteEl.style.color = "var(--baja)";
   }
   rInput.addEventListener("input", ()=>{ b76RManual = true; });
-
   ["b76-fwd","b76-vol","b76-kput","b76-kcall","b76-dias","b76-r"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularBlack76);
   });
   calcularBlack76();
 }
-
 window.PANEL_INIT = function(){
   registrarZoom();
 fetch(DATA_URL)
@@ -1194,7 +1168,6 @@ fetch(DATA_URL)
       "restricciones del navegador). Verifica también que el workflow ya haya generado el archivo. ("+e.message+")");
   });
 };
-
 function haceCuanto(antes, ahora){
   let seg = Math.round((ahora - antes)/1000);
   if(seg < 60) return "hace un momento";
@@ -1205,11 +1178,9 @@ function haceCuanto(antes, ahora){
   let dias = Math.floor(h/24);
   return "hace " + dias + (dias===1?" día":" días");
 }
-
 function render(d){
   DATA = d;
   const gen = d.generado_iso ? new Date(d.generado_iso) : null;
-
   function pintarMeta(){
     const ahora = new Date();
     let s;
@@ -1226,12 +1197,10 @@ function render(d){
   }
   pintarMeta();
   setInterval(pintarMeta, 1000);
-
   document.getElementById("footer").innerHTML =
     "Fuentes — " + d.fuentes + ".<br>Generado automáticamente el " + d.generado +
     ". El % junto a cada cifra compara el último dato con el anterior disponible; "+
     "las fechas pueden diferir según el rezago de cada fuente.";
-
   // repartir tarjetas por sección (resumen = commodities + divisas)
   const cDiv=document.getElementById("cards-divisas");
   const cCom=document.getElementById("cards-commodities");
@@ -1244,7 +1213,6 @@ function render(d){
   construirChatarra();     // tarjetas + paneles de Chatarra
   construirProductores();  // tarjetas + toggle de Productores (worldsteel)
   construirAcereras();// tarjeta de correlación + cobertura
-
   // pestañas (Coberturas pide contraseña la primera vez por sesión)
   document.querySelectorAll(".tab").forEach(b=> b.addEventListener("click", async ()=>{
     if(b.dataset.tab==="swap" && !cobAuth){
@@ -1254,7 +1222,6 @@ function render(d){
     mostrarTab(b.dataset.tab);
   }));
   mostrarTab("divisas");   // pestaña inicial
-
   // descarga de Excel (misma contraseña que Coberturas)
   const dlExcel = document.getElementById("dl-excel");
   if(dlExcel){
@@ -1266,14 +1233,11 @@ function render(d){
       }
     });
   }
-
   // botón de descarga de Escenarios
   const cpDl = document.getElementById("cp-download");
   if(cpDl) cpDl.addEventListener("click", descargarEscenariosCSV);
-
   // calculadora Black-76
   iniciarBlack76();
 }
-
 })();
 }
