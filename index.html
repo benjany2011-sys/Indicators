@@ -291,6 +291,50 @@ select:focus{outline:none;border-color:var(--naranja);}
 </div>
 </div>
 <div class="cobertura">Fair value WMC esperado = hedge ratio × HSC forward + intercepto, según la regresión de 36 observaciones (R²=0.9850). El margen objetivo se deriva del Standard Error de esa misma regresión (k × SE): k=1 tolera hasta una desviación estándar de ruido normal del modelo (~68% de los casos históricos), k=1.65 ~90%, k=2 ~95% — entre más alto el k, menos falsas alarmas pero más lento para detectar un margen real que te esté cobrando el dealer. El margen implícito es la diferencia entre el precio de swap cotizado y ese fair value ponderado por volumen; si queda por debajo de tu margen objetivo, la cotización está a tu favor. Actualiza la curva forward con los valores reales de CME/EIA para cada strip que evalúes.</div>
+<div class="seccion-titulo" style="margin-top:34px;">Cobertura por tramos — varios precios, mismo periodo</div>
+<div class="grid-graf">
+<div class="panel">
+<h3>Consumo del periodo</h3>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Consumo total a cubrir (MMBtu)</label>
+<input type="number" id="tr-consumo" step="100" value="30000" class="prod-sel" style="width:100%;">
+</div>
+<div style="margin-bottom:12px;">
+<label style="display:block;font-size:12px;color:#9aa0a6;margin-bottom:4px;">Precio de referencia para comparar — spot o fair value ($/MMBtu)</label>
+<input type="number" id="tr-ref" step="0.001" value="2.90" class="prod-sel" style="width:100%;">
+</div>
+<button class="btn ghost" id="tr-add" style="font-size:12px;padding:6px 12px;">+ Agregar tramo</button>
+</div>
+<div class="panel">
+<h3>Resultado del blend</h3>
+<div class="cards" style="grid-template-columns:1fr 1fr;">
+<div class="card"><div class="nombre">Volumen total cubierto</div><div class="valor" id="tr-volTotal" style="font-size:18px;">—</div></div>
+<div class="card"><div class="nombre">% de cobertura</div><div class="valor" id="tr-cobertura" style="font-size:18px;">—</div></div>
+</div>
+<div class="cards" style="grid-template-columns:1fr;margin-top:10px;">
+<div class="card"><div class="nombre">Precio promedio ponderado (blend)</div><div class="valor" id="tr-blend" style="font-size:22px;">—</div></div>
+</div>
+<div class="cobertura" id="tr-veredicto">—</div>
+</div>
+</div>
+<div class="panel ancho" style="margin-top:14px;">
+<h3>Tramos</h3>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+<thead>
+<tr style="color:#9aa0a6;text-align:right;">
+<th style="text-align:left;padding:6px 8px;">Tramo</th>
+<th style="padding:6px 8px;">Precio ($/MMBtu)</th>
+<th style="padding:6px 8px;">Volumen (MMBtu)</th>
+<th style="padding:6px 8px;">% del total</th>
+<th style="padding:6px 8px;"></th>
+</tr>
+</thead>
+<tbody id="tr-tbody"></tbody>
+</table>
+</div>
+</div>
+<div class="cobertura">Útil cuando cubres el mismo periodo de consumo en varias operaciones a distinto precio (por ejemplo, 3 swaps al 33% cada uno en fechas distintas, como ya lo has hecho). El precio blend es el promedio ponderado por volumen de todos los tramos; compáralo contra tu fair value o spot de referencia para ver el costo efectivo real de la estrategia combinada.</div>
 <div class="seccion-titulo" style="margin-top:34px;">Black-76 — valuación de opciones (¿el collar es justo?)</div>
 <div class="grid-graf">
 <div class="panel">
