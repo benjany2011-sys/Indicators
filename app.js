@@ -827,13 +827,11 @@ function iniciarTramos(){
   ["tr-consumo","tr-ref"].forEach(id=>{
     document.getElementById(id).addEventListener("input", calcularTramos);
   });
-  // arranca con 3 tramos de ejemplo (como la estrategia real: 3 hedges al 33%)
-  agregarTramo(3.06); agregarTramo(3.06); agregarTramo(3.06);
+  // arranca con 3 tramos vacíos, listos para que captures tus datos reales
+  agregarTramo(0); agregarTramo(0); agregarTramo(0);
 }
 function agregarTramo(precio){
-  const consumo = parseFloat(document.getElementById("tr-consumo").value)||0;
-  const volDefault = consumo>0 ? Math.round(consumo/Math.max(TR_TRAMOS.length+1,3)) : 0;
-  TR_TRAMOS.push({ id: TR_ID++, precio: precio!=null?precio:2.90, volumen: volDefault });
+  TR_TRAMOS.push({ id: TR_ID++, precio: precio!=null?precio:0, volumen: 0 });
   renderTramos();
 }
 function eliminarTramo(id){
